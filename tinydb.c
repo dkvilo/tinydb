@@ -1,47 +1,93 @@
 #include "tinydb.h"
 #include "tinydb_hash.h"
-
-#define STB_DS_IMPLEMENTATION
-#include "external/stb_ds.h"
+#include "tinydb_log.h"
+#include "tinydb_snapshot.h"
 
 RuntimeContext*
-Initialize_Context(int32_t num_databases)
+Initialize_Context(int32_t num_databases, const char* snapshot_file)
 {
   RuntimeContext* context = (RuntimeContext*)malloc(sizeof(RuntimeContext));
   if (context == NULL) {
-    fprintf(stderr, "Failed to allocate memory for RuntimeContext\n");
+    DB_Log(DB_LOG_ERROR, "Failed to allocate memory for RuntimeContext.");
     return NULL;
   }
 
-  // Initialize DatabaseManager
+  context->Active.db = NULL;
+  context->Active.user = NULL;
+
+  if (snapshot_file != NULL) {
+    if (Import_Snapshot(context, snapshot_file) == 0) {
+      return context;
+    } else {
+      DB_Log(DB_LOG_WARNING,
+             "Failed to import snapshot. Initializing empty context.");
+    }
+  }
+
+  // normal initialization if there was no snapshot or failed to import
   context->db_manager.num_databases = num_databases;
   context->db_manager.databases =
     (Database*)malloc(sizeof(Database) * num_databases);
   if (context->db_manager.databases == NULL) {
-    fprintf(stderr, "Failed to allocate memory for databases\n");
+    DB_Log(DB_LOG_ERROR, "Failed to allocate memory for databases");
     free(context);
     return NULL;
   }
 
-  // Initialize each Database
+  // initializing each db
   for (int32_t i = 0; i < num_databases; ++i) {
     Database* db = &context->db_manager.databases[i];
     db->ID = i;
     db->name = NULL;
-
-    // Initialize shards
     Initialize_Database(db);
   }
 
-  // Initialize UserManager (basic initialization, expand as needed)
   context->user_manager.users = NULL;
   context->user_manager.num_users = 0;
 
-  // Initialize Active context
-  context->Active.db = NULL;
-  context->Active.user = NULL;
-
   return context;
+}
+
+void
+Cleanup_Partial_Context(RuntimeContext* context, int32_t num_initialized_dbs)
+{
+  for (int32_t i = 0; i < num_initialized_dbs; ++i) {
+    Database* db = &context->db_manager.databases[i];
+    free(db->name);
+    for (int j = 0; j < NUM_SHARDS; ++j) {
+      HM_Destroy(db->shards[j].entries);
+      pthread_rwlock_destroy(&db->shards[j].rwlock);
+    }
+  }
+  free(context->db_manager.databases);
+  free(context);
+}
+
+void
+Initialize_Database(Database* db)
+{
+  for (int i = 0; i < NUM_SHARDS; i++) {
+    db->shards[i].entries = HM_Create();
+    if (db->shards[i].entries == NULL) {
+      DB_Log(DB_LOG_ERROR, "Failed to create hash map for shard %d", i);
+      for (int j = 0; j < i; j++) {
+        HM_Destroy(db->shards[j].entries);
+        pthread_rwlock_destroy(&db->shards[j].rwlock);
+      }
+      return;
+    }
+    db->shards[i].num_entries = 0;
+
+    if (pthread_rwlock_init(&db->shards[i].rwlock, NULL) != 0) {
+      DB_Log(DB_LOG_ERROR, "Error initializing rwlock for shard %d", i);
+      for (int j = 0; j <= i; j++) {
+        HM_Destroy(db->shards[j].entries);
+        if (j < i)
+          pthread_rwlock_destroy(&db->shards[j].rwlock);
+      }
+      return;
+    }
+  }
 }
 
 void
@@ -56,17 +102,8 @@ Free_Context(RuntimeContext* context)
 
     for (int j = 0; j < NUM_SHARDS; ++j) {
       DatabaseShard* shard = &db->shards[j];
-      for (uint64_t k = 0; k < shard->num_entries; ++k) {
-        free(shard->entries[k].key);
-        if (shard->entries[k].type == DB_ENTRY_STRING) {
-          free(shard->entries[k].value.string.value);
-        }
-
-        // note (David): we need to do clean up for DB_ENTRY_OBJECT as well.
-        // todo
-      }
-      free(shard->entries);
-      pthread_mutex_destroy(&shard->mutex);
+      HM_Destroy(shard->entries);
+      pthread_rwlock_destroy(&shard->rwlock);
     }
   }
   free(context->db_manager.databases);
@@ -75,8 +112,8 @@ Free_Context(RuntimeContext* context)
     free(context->user_manager.users[i].name);
     free(context->user_manager.users[i].access);
   }
-
   free(context->user_manager.users);
+
   free(context);
 }
 
@@ -88,16 +125,6 @@ Pick_Shard(const char* key)
 }
 
 void
-Initialize_Database(Database* db)
-{
-  for (int i = 0; i < NUM_SHARDS; i++) {
-    db->shards[i].entries = NULL;
-    db->shards[i].num_entries = 0;
-    pthread_mutex_init(&db->shards[i].mutex, NULL);
-  }
-}
-
-void
 DB_Atomic_Store(Database* db,
                 const char* key,
                 DB_Value value,
@@ -105,39 +132,49 @@ DB_Atomic_Store(Database* db,
 {
   int32_t shard_id = Pick_Shard(key);
   DatabaseShard* shard = &db->shards[shard_id];
+  if (pthread_rwlock_wrlock(&shard->rwlock) != 0) {
+    DB_Log(DB_LOG_ERROR, "Error acquiring write lock for shard %d", shard_id);
+    return;
+  }
 
-  pthread_mutex_lock(&shard->mutex);
-  DatabaseEntry* existing_entry = hmgetp_null(shard->entries, key);
+  DatabaseEntry* existing_entry = HM_Get(shard->entries, key);
   if (existing_entry != NULL) {
-    atomic_store(&existing_entry->value, value);
+    existing_entry->value = value;
     existing_entry->type = type;
   } else {
-    DatabaseEntry new_entry = { strdup(key), value, type };
-    shput(shard->entries, new_entry.key, value);
+    DatabaseEntry* new_entry = (DatabaseEntry*)malloc(sizeof(DatabaseEntry));
+    new_entry->key = strdup(key);
+    new_entry->value = value;
+    new_entry->type = type;
+    HM_Put(shard->entries, new_entry->key, new_entry);
     shard->num_entries++;
   }
-  pthread_mutex_unlock(&shard->mutex);
+
+  // release the write lock
+  pthread_rwlock_unlock(&shard->rwlock);
 }
 
 DB_Value
-DB_Atomic_Get(Database* db, const char* key, DB_ENTRY_TYPE* type)
+DB_Atomic_Get(Database* db, const char* key, DB_ENTRY_TYPE type)
 {
   int32_t shard_id = Pick_Shard(key);
   DatabaseShard* shard = &db->shards[shard_id];
+  if (pthread_rwlock_rdlock(&shard->rwlock) != 0) {
+    DB_Log(DB_LOG_ERROR, "Failed to acquire read lock for shard %d", shard_id);
+    DB_Value result;
+    memset(&result, 0, sizeof(DB_Value));
+    return result;
+  }
 
-  pthread_mutex_lock(&shard->mutex);
-  /*
-  DatabaseEntry *entry = hmgetp_null(shard->entries, key);
+  DatabaseEntry* entry = HM_Get(shard->entries, key);
+
   DB_Value result;
-
   if (entry != NULL) {
-    result = atomic_load(&entry->value);
-  } else { // not found, default type for now will be Number
+    result = entry->value;
+  } else {
     memset(&result, 0, sizeof(DB_Value));
   }
-  */
 
-  DB_Value result = shget(shard->entries, key);
-  pthread_mutex_unlock(&shard->mutex);
+  pthread_rwlock_unlock(&shard->rwlock);
   return result;
 }

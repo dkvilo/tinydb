@@ -1,1 +1,6 @@
 tinydb
+.DS_Store
+*.dSYM/
+DUMP.TXT
+.vscode/
+*.bin

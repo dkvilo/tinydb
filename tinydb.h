@@ -7,7 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define NUM_SHARDS 16
+#include "tinydb_hashmap.h"
+#include "config.h"
 
 typedef uint64_t EntryID;
 
@@ -78,9 +79,10 @@ typedef struct
 
 typedef struct
 {
-  DatabaseEntry* entries;
+  // DatabaseEntry* entries;
+  HashMap* entries;
   uint64_t num_entries;
-  pthread_mutex_t mutex;
+  pthread_rwlock_t rwlock;
 } DatabaseShard;
 
 typedef struct
@@ -108,7 +110,10 @@ typedef struct RuntimeContext
 } RuntimeContext;
 
 RuntimeContext*
-Initialize_Context(int32_t num_databases);
+Initialize_Context(int32_t num_databases, const char* snapshot_file);
+
+void
+Cleanup_Partial_Context(RuntimeContext* context, int32_t num_initialized_dbs);
 
 void
 Free_Context(RuntimeContext* context);
@@ -123,7 +128,7 @@ DB_Atomic_Store(Database* db,
                 DB_ENTRY_TYPE type);
 
 DB_Value
-DB_Atomic_Get(Database* db, const char* key, DB_ENTRY_TYPE* type);
+DB_Atomic_Get(Database* db, const char* key, DB_ENTRY_TYPE type);
 
 void
 Initialize_Database(Database* db);
