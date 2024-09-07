@@ -8,8 +8,7 @@
 #include <unistd.h>
 #include <string.h>
 
-#define PORT        8079
-#define BUFFER_SIZE 1023
+#include "config.h"
 
 typedef struct TCP_Client
 {
@@ -24,8 +23,8 @@ typedef struct TCP_Server
   struct    sockaddr_in server;
 } TCP_Server;
 
-void TCP_create_server(TCP_Server *sv);
+void TCP_Server_Create(TCP_Server *sv);
 
-void TCP_server_process_connections(TCP_Server *sv, TCP_Client *c, void (*function)(void*));
+void TCP_Server_Process_Connections(TCP_Server *sv, TCP_Client *c, void (*function)(void*));
 
 #endif // __TINY_DB_TCP_SERVER

@@ -1,2 +1,2 @@
 build:
-	gcc -ggdb -pedantic -Wno-discarded-qualifiers *.c -o tinydb -lpthread 
+	clang -glldb -pedantic -Wno-strict-prototypes -Wno-newline-eof -Wno-ignored-qualifiers *.c -o tinydb -lpthread 
