@@ -137,11 +137,13 @@ DB_Atomic_Store(Database* db,
   new_entry->key = strdup(key);
   new_entry->value = value;
   new_entry->type = type;
-  void* old_value = HM_Put(shard->entries, new_entry->key, new_entry);
-  if (old_value != NULL) {
+  int8_t state = HM_Put(shard->entries, new_entry->key, new_entry);
+
+  if (state == HM_ACTION_FAILED) {
+    free(new_entry->key);
+    free(new_entry);
+  } else if (state == HM_ACTION_ADDED) {
     atomic_fetch_add(&shard->num_entries, 1);
-  } else {
-    free(old_value);
   }
 }
 
