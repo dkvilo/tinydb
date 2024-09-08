@@ -14,6 +14,10 @@
 #define LOAD_FACTOR_THRESHOLD 0.75
 #define RESIZE_WORK_INCREMENT 64
 
+#define HM_ACTION_FAILED -1
+#define HM_ACTION_ADDED 0
+#define HM_ACTION_MODIFIED 1
+
 typedef struct HashEntry
 {
   char* key;
@@ -43,7 +47,10 @@ HM_Create();
 void
 HM_Destroy(HashMap* map);
 
-void
+/**
+ * @returns -1 Failed, 0 Added, 1 Modified
+ */
+int8_t
 HM_Put(HashMap* map, const char* key, void* value);
 
 void*

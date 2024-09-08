@@ -132,26 +132,19 @@ DB_Atomic_Store(Database* db,
 {
   int32_t shard_id = Pick_Shard(key);
   DatabaseShard* shard = &db->shards[shard_id];
-  if (pthread_rwlock_wrlock(&shard->rwlock) != 0) {
-    DB_Log(DB_LOG_ERROR, "Error acquiring write lock for shard %d", shard_id);
-    return;
-  }
 
-  DatabaseEntry* existing_entry = HM_Get(shard->entries, key);
-  if (existing_entry != NULL) {
-    existing_entry->value = value;
-    existing_entry->type = type;
-  } else {
-    DatabaseEntry* new_entry = (DatabaseEntry*)malloc(sizeof(DatabaseEntry));
-    new_entry->key = strdup(key);
-    new_entry->value = value;
-    new_entry->type = type;
-    HM_Put(shard->entries, new_entry->key, new_entry);
-    shard->num_entries++;
-  }
+  DatabaseEntry* new_entry = (DatabaseEntry*)malloc(sizeof(DatabaseEntry));
+  new_entry->key = strdup(key);
+  new_entry->value = value;
+  new_entry->type = type;
+  int8_t state = HM_Put(shard->entries, new_entry->key, new_entry);
 
-  // release the write lock
-  pthread_rwlock_unlock(&shard->rwlock);
+  if (state == HM_ACTION_FAILED) {
+    free(new_entry->key);
+    free(new_entry);
+  } else if (state == HM_ACTION_ADDED) {
+    atomic_fetch_add(&shard->num_entries, 1);
+  }
 }
 
 DB_Value
@@ -159,13 +152,6 @@ DB_Atomic_Get(Database* db, const char* key, DB_ENTRY_TYPE type)
 {
   int32_t shard_id = Pick_Shard(key);
   DatabaseShard* shard = &db->shards[shard_id];
-  if (pthread_rwlock_rdlock(&shard->rwlock) != 0) {
-    DB_Log(DB_LOG_ERROR, "Failed to acquire read lock for shard %d", shard_id);
-    DB_Value result;
-    memset(&result, 0, sizeof(DB_Value));
-    return result;
-  }
-
   DatabaseEntry* entry = HM_Get(shard->entries, key);
 
   DB_Value result;
@@ -175,6 +161,5 @@ DB_Atomic_Get(Database* db, const char* key, DB_ENTRY_TYPE type)
     memset(&result, 0, sizeof(DB_Value));
   }
 
-  pthread_rwlock_unlock(&shard->rwlock);
   return result;
 }

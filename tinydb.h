@@ -79,9 +79,8 @@ typedef struct
 
 typedef struct
 {
-  // DatabaseEntry* entries;
   HashMap* entries;
-  uint64_t num_entries;
+  atomic_size_t num_entries;
   pthread_rwlock_t rwlock;
 } DatabaseShard;
 
