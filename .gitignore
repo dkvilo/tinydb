@@ -4,3 +4,4 @@ tinydb
 DUMP.TXT
 .vscode/
 *.bin
+test/tests
