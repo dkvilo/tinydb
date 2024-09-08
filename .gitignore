@@ -5,3 +5,7 @@ DUMP.TXT
 .vscode/
 *.bin
 test/tests
+
+# python env
+redis-env/
+benchmark/__pycache__
