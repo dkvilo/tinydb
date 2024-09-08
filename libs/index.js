@@ -10,7 +10,7 @@ async function main() {
     await client.set("mykey", "Hello, TinyDB!");
     console.log("Set key: mykey");
 
-    const value = await client.get("2000");
+    const value = await client.get("mykey");
     console.log("Got value:", value);
 
     await client.append("mykey", " Appended text.");

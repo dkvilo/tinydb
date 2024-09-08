@@ -5,7 +5,7 @@ import threading
 import random
 import argparse
 
-key_counter = 1 # Offset
+key_counter = 1
 counter_lock = threading.Lock()
 
 def get_next_key():
@@ -67,7 +67,6 @@ def perform_stress_test(num_clients, num_operations, host, port, operation_type)
         for client_id in range(num_clients):
             futures.append(executor.submit(send_commands, client_id, operations_per_client, host, port, operation_type))
 
-        # Wait for all clients to complete their operations
         for future in concurrent.futures.as_completed(futures):
             future.result()
 
