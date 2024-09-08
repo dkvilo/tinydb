@@ -126,8 +126,8 @@ DB_Atomic_Store(Database* db,
                 DB_Value value,
                 DB_ENTRY_TYPE type);
 
-DB_Value
-DB_Atomic_Get(Database* db, const char* key, DB_ENTRY_TYPE type);
+DatabaseEntry
+DB_Atomic_Get(Database* db, const char* key);
 
 void
 Initialize_Database(Database* db);
