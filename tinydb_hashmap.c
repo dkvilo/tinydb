@@ -158,7 +158,10 @@ resize_if_needed(HashMap* map)
   resize_increment(map);
 }
 
-void*
+/**
+ * @returns -1 Failed, 0 Added, 1 Modified
+ */
+int8_t
 HM_Put(HashMap* map, const char* key, void* value)
 {
   resize_if_needed(map);
@@ -187,14 +190,14 @@ HM_Put(HashMap* map, const char* key, void* value)
       map->entries[index].is_deleted = false;
 
       pthread_rwlock_unlock(&map->locks[index]);
-      return value;
+      return HM_ACTION_ADDED;
     }
 
     if (strcmp(map->entries[index].key, key) == 0) {
       map->entries[index].value = value;
       map->entries[index].is_deleted = false;
       pthread_rwlock_unlock(&map->locks[index]);
-      return value;
+      return HM_ACTION_MODIFIED;
     }
 
     pthread_rwlock_unlock(&map->locks[index]);
@@ -202,6 +205,8 @@ HM_Put(HashMap* map, const char* key, void* value)
 
     index = Quad_Probe(index, i, map->capacity);
   }
+
+  return HM_ACTION_FAILED;
 }
 
 void*
