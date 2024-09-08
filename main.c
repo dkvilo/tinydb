@@ -36,13 +36,31 @@ Signal_Handler(int signum)
   exit(0);
 }
 
+void log_tinydb_ascii_art() {
+  const char* tinydb_ascii_art = 
+  "       _          _          _           _        _       _            _       \n"
+  "      /\\ \\       /\\ \\       /\\ \\     _  /\\ \\     /\\_\\    /\\ \\         / /\\     \n"
+  "      \\_\\ \\      \\ \\ \\     /  \\ \\   /\\_\\\\ \\ \\   / / /   /  \\ \\____   / /  \\    \n"
+  "      /\\__ \\     /\\ \\_\\   / /\\ \\ \\_/ / / \\ \\ \\_/ / /   / /\\ \\_____\\ / / /\\ \\   \n"
+  "     / /_ \\ \\   / /\\/_/  / / /\\ \\___/ /   \\ \\___/ /   / / /\\/___  // / /\\ \\ \\  \n"
+  "    / / /\\ \\ \\ / / /    / / /  \\/____/     \\ \\ \\_/   / / /   / / // / /\\ \\_\\ \\ \n"
+  "   / / /  \\/_// / /    / / /    / / /       \\ \\ \\   / / /   / / // / /\\ \\ \\___\\\n"
+  "  / / /      / / /    / / /    / / /         \\ \\ \\ / / /   / / // / /  \\ \\ \\__/ \n"
+  " / / /   ___/ / /__  / / /    / / /           \\ \\ \\\\ \\ \\__/ / // / /____\\_\\ \\   \n"
+  "/_/ /   /\\__/\\/_/__\\/ / /    / / /             \\ \\_\\\\ \\___\\ / // / /__________\\ \n"
+  "\\_\\/    \\/_________/\\/ /     \\/_/               \\/_/ \\/_____/ \\/_____________/ \n";
+
+  printf("\n%s\n", tinydb_ascii_art);
+}
+
 int
 main(int argc, char const* argv[])
 {
   atexit(After_Exit_Hook);
   signal(SIGINT, Signal_Handler);
 
-  DB_Log(DB_LOG_INFO, "> %s Version %s Dev.\n", TINYDB_SIGNATURE, TINYDB_VERSION);
+  log_tinydb_ascii_art();
+  DB_Log(DB_LOG_INFO, "> %s Version %s Dev.", TINYDB_SIGNATURE, TINYDB_VERSION);
 
   Thread_Pool_Init();
   DB_Log(DB_LOG_INFO, "Thread Pool has been created.");
@@ -50,12 +68,23 @@ main(int argc, char const* argv[])
   context = Initialize_Context(NUM_INITAL_DATABASES, DEFAULT_SNAPSHOT_NAME);
   DB_Log(DB_LOG_INFO, "RuntimeContext has been allocated and initialized.");
 
+#if 0
+  context->user_manager.users = (DB_User*) malloc(sizeof(DB_User));
+  context->user_manager.users[0].ID = 0;
+  context->user_manager.users[0].name = "default";
+  context->user_manager.users[0].access = (DB_Access*)malloc(sizeof(DB_Access));
+  context->user_manager.users[0].access[0].database = 0;
+  context->user_manager.users[0].access[0].acl = DB_READ | DB_WRITE | DB_DELETE;
+
+  SHA256(context->user_manager.users[0].password, "123", 3);
+  context->user_manager.num_users++;
+#endif
+
   db = context->db_manager.databases;
   if (!db->name) {
     db->name = "default";
   }
-
-  DB_Log(DB_LOG_INFO, "Default Database (%s) has been created.", db->name);
+  DB_Log(DB_LOG_INFO, "Default Database (%s) has been assigned.", db->name);
 
   TCP_Server tcp_server = { 0 };
   TCP_Client tcp_client = { 0 };
