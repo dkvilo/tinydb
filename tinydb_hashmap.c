@@ -158,7 +158,7 @@ resize_if_needed(HashMap* map)
   resize_increment(map);
 }
 
-void
+void*
 HM_Put(HashMap* map, const char* key, void* value)
 {
   resize_if_needed(map);
@@ -167,7 +167,7 @@ HM_Put(HashMap* map, const char* key, void* value)
   size_t index = hash(key, map->capacity);
   size_t i = 0;
 
-  while (true) {
+  for (;;) {
     pthread_rwlock_wrlock(&map->locks[index]);
 
     if (!map->entries[index].is_occupied || map->entries[index].is_deleted) {
@@ -187,14 +187,14 @@ HM_Put(HashMap* map, const char* key, void* value)
       map->entries[index].is_deleted = false;
 
       pthread_rwlock_unlock(&map->locks[index]);
-      return;
+      return value;
     }
 
     if (strcmp(map->entries[index].key, key) == 0) {
       map->entries[index].value = value;
       map->entries[index].is_deleted = false;
       pthread_rwlock_unlock(&map->locks[index]);
-      return;
+      return value;
     }
 
     pthread_rwlock_unlock(&map->locks[index]);

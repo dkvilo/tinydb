@@ -43,7 +43,7 @@ HM_Create();
 void
 HM_Destroy(HashMap* map);
 
-void
+void*
 HM_Put(HashMap* map, const char* key, void* value);
 
 void*
