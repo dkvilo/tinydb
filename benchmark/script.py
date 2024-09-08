@@ -73,7 +73,7 @@ def perform_stress_test(num_clients, num_operations, host, port, operation_type)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Perform a stress test on a server.')
-    parser.add_argument('--host', type=str, default='192.168.3.2', help='Server host to connect to')
+    parser.add_argument('--host', type=str, default='0.0.0.0', help='Server host to connect to')
     parser.add_argument('--port', type=int, default=8079, help='Server port to connect to')
     parser.add_argument('--op', type=str, choices=['set', 'get', 'all'], default='all', help='Operation type: set, get, or all')
     parser.add_argument('--client', type=int, default=50, help='Number of clients')
