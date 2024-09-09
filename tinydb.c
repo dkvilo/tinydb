@@ -147,19 +147,13 @@ DB_Atomic_Store(Database* db,
   }
 }
 
-DB_Value
-DB_Atomic_Get(Database* db, const char* key, DB_ENTRY_TYPE type)
+DatabaseEntry
+DB_Atomic_Get(Database* db, const char* key)
 {
   int32_t shard_id = Pick_Shard(key);
   DatabaseShard* shard = &db->shards[shard_id];
   DatabaseEntry* entry = HM_Get(shard->entries, key);
 
-  DB_Value result;
-  if (entry != NULL) {
-    result = entry->value;
-  } else {
-    memset(&result, 0, sizeof(DB_Value));
-  }
-
-  return result;
+  if (entry != NULL) return *entry;
+  return (DatabaseEntry){ .type = DB_ENTRY_STRING, .value = { .string = "null" } };
 }
