@@ -34,7 +34,8 @@ DB_Utils_Save_To_File(Database* db, const char* filename)
                   db_entry->key,
                   db_entry->value.string.value);
         } else if (db_entry->type == DB_ENTRY_NUMBER) {
-          fprintf(file, "%d:%s:%" PRId64 ":NUMBER\n",
+          fprintf(file,
+                  "%d:%s:%" PRId64 ":NUMBER\n",
                   shard_id,
                   db_entry->key,
                   db_entry->value.number.value);
@@ -55,4 +56,21 @@ DB_Utils_Save_To_File(Database* db, const char* filename)
 
   fclose(file);
   DB_Log(DB_LOG_INFO, "Database was exported in TEXT format to %s", filename);
+}
+
+void
+Append_To_Buffer(char** buffer,
+                 const char* str,
+                 size_t* buffer_size,
+                 size_t* buffer_len)
+{
+  size_t len = strlen(str);
+  if (*buffer_len + len >= *buffer_size) {
+    *buffer_size *= 2;
+    *buffer = realloc(*buffer, *buffer_size);
+  }
+
+  memcpy(*buffer + *buffer_len, str, len);
+  *buffer_len += len;
+  (*buffer)[*buffer_len] = '\0';
 }

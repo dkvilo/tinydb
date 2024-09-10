@@ -9,6 +9,7 @@
 
 #include "tinydb_hashmap.h"
 #include "config.h"
+#include "tinydb_list.h"
 
 typedef uint64_t EntryID;
 
@@ -46,6 +47,7 @@ typedef enum
   DB_ENTRY_STRING,
   DB_ENTRY_NUMBER,
   DB_ENTRY_OBJECT,
+  DB_ENTRY_LIST
 } DB_ENTRY_TYPE;
 
 typedef struct DB_Number
@@ -68,6 +70,7 @@ typedef union
   DB_Number number;
   DB_String string;
   DB_Object object;
+  HPLinkedList* list;
 } DB_Value;
 
 typedef struct

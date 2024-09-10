@@ -81,6 +81,32 @@ Export_Snapshot(RuntimeContext* ctx, const char* filename)
             case DB_ENTRY_STRING:
               write_string(file, entry->value.string.value);
               break;
+            case DB_ENTRY_LIST: {
+              HPLinkedList* list = entry->value.list;
+              fwrite(&list->count, sizeof(size_t), 1, file); // list size
+
+              ListNode* current = list->head;
+              while (current) {
+                // node type
+                fwrite(&current->type, sizeof(ValueType), 1, file);
+
+                // node value based on its type
+                switch (current->type) {
+                  case TYPE_STRING:
+                    write_string(file, current->value.string_value);
+                    break;
+                  case TYPE_INT:
+                    fwrite(&current->value.int_value, sizeof(int64_t), 1, file);
+                    break;
+                  case TYPE_FLOAT:
+                    fwrite(
+                      &current->value.float_value, sizeof(double), 1, file);
+                    break;
+                }
+
+                current = current->next;
+              }
+            } break;
             case DB_ENTRY_OBJECT:
               DB_Log(DB_LOG_WARNING,
                      "DB_ENTRY_OBJECT not implemented for key %s",
@@ -240,6 +266,36 @@ Import_Snapshot(RuntimeContext* ctx, const char* filename)
           case DB_ENTRY_STRING:
             entry->value.string.value = read_string_mmap(&ptr);
             break;
+
+          case DB_ENTRY_LIST: {
+            size_t list_size = *(size_t*)ptr;
+            ptr += sizeof(size_t);
+
+            HPLinkedList* list = HPList_Create();
+            for (size_t n = 0; n < list_size; n++) {
+              ValueType node_type = *(ValueType*)ptr;
+              ptr += sizeof(ValueType);
+
+              switch (node_type) {
+                case TYPE_STRING: {
+                  char* str_value = read_string_mmap(&ptr);
+                  HPList_RPush_String(list, str_value);
+                  free(str_value);
+                } break;
+                case TYPE_INT: {
+                  int64_t int_value = *(int64_t*)ptr;
+                  ptr += sizeof(int64_t);
+                  HPList_RPush_Int(list, int_value);
+                } break;
+                case TYPE_FLOAT: {
+                  double float_value = *(double*)ptr;
+                  ptr += sizeof(double);
+                  HPList_RPush_Float(list, float_value);
+                } break;
+              }
+            }
+            entry->value.list = list;
+          } break;
           case DB_ENTRY_OBJECT:
             DB_Log(DB_LOG_WARNING,
                    "DB_ENTRY_OBJECT not implemented for key %s",
