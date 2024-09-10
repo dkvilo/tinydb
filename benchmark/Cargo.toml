@@ -1,0 +1,20 @@
+[package]
+name = "benchmark"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+redis = "0.23.0"
+rand = "0.8"
+
+[[bin]]
+name = "resp"
+path = "src/resp.rs"
+
+[[bin]]
+name = "redis"
+path = "src/redis.rs"
+
+[[bin]]
+name = "tinydb"
+path = "src/tinydb.rs"
