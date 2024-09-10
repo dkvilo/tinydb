@@ -164,6 +164,10 @@ resize_if_needed(HashMap* map)
 int8_t
 HM_Put(HashMap* map, const char* key, void* value)
 {
+  if (key == NULL) {
+    return HM_ACTION_FAILED;
+  }
+  
   resize_if_needed(map);
   resize_increment(map);
 
