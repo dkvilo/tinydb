@@ -28,7 +28,6 @@ detect_token_type(const char* token)
       break;
     }
   }
-
   return is_number ? TOKEN_NUMBER : TOKEN_STRING;
 }
 
@@ -68,15 +67,34 @@ Parse_Command(const char* input)
     cmd->command = strdup(token);
   }
 
-  while ((token = strtok(NULL, " ")) != NULL && cmd->argc < MAX_ARGS) {
-    TOKEN token_type = detect_token_type(token);
-    if (token_type == TOKEN_STRING) {
-      token = trim_quotes(token);
-    }
+  char* rest = strtok(NULL, "");
+  if (rest) {
+    char* key = strtok(rest, " ");
+    if (key) {
+      cmd->argv[cmd->argc] = strdup(key);
+      cmd->types[cmd->argc] = TOKEN_STRING;
+      cmd->argc++;
 
-    cmd->argv[cmd->argc] = strdup(token);
-    cmd->types[cmd->argc] = token_type;
-    cmd->argc++;
+      char* value = strtok(NULL, "");
+      if (value) {
+        while (*value == ' ')
+          value++;
+
+        if (value[0] == '"') {
+          char* end_quote = strrchr(value, '"');
+          if (end_quote) {
+            *end_quote = '\0';
+            cmd->argv[cmd->argc] = strdup(value + 1);
+          } else {
+            cmd->argv[cmd->argc] = strdup(value);
+          }
+        } else {
+          cmd->argv[cmd->argc] = strdup(value);
+        }
+        cmd->types[cmd->argc] = detect_token_type(cmd->argv[cmd->argc]);
+        cmd->argc++;
+      }
+    }
   }
 
   free(input_copy);
