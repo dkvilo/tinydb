@@ -6,9 +6,5 @@ DUMP.TXT
 *.bin
 test/tests
 
-# python env
-redis-env/
-benchmark/__pycache__
-
 # rust 
 benchmark/target/
