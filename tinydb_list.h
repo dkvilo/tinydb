@@ -77,4 +77,7 @@ HPList_LPop(HPLinkedList* list);
 char*
 HPList_ToString(HPLinkedList* list);
 
+char*
+HPList_RangeToString(HPLinkedList* list, int32_t start, int32_t stop);
+
 #endif // __TINY_DB_LIST

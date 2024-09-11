@@ -400,44 +400,15 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
     int stop = atoi(cmd->argv[2]);
 
     DatabaseEntry res = DB_Atomic_Get(db, key);
-
-    if (res.type == DB_ENTRY_LIST) {
+    if (res.type == DB_ENTRY_LIST)
+    {
       HPLinkedList* list = res.value.list;
-      pthread_rwlock_rdlock(&list->rwlock);
+      char* buffer = HPList_ToString(list);
+      TCP_Write(sock, buffer, 1);
 
-      ListNode* current = list->head;
-      int index = 0;
-
-      // skip start
-      while (current && index < start) {
-        current = current->next;
-        index++;
-      }
-
-      // iterating from start to stop
-      while (current && index <= stop) {
-        if (current->type == TYPE_STRING) {
-          TCP_Write(sock, current->value.string_value, 0);
-        } else if (current->type == TYPE_INT) {
-          char buffer[32];
-          sprintf(buffer, "%" PRId64, current->value.int_value);
-          TCP_Write(sock, buffer, 0);
-        } else if (current->type == TYPE_FLOAT) {
-          char buffer[32];
-          sprintf(buffer, "%f", current->value.float_value);
-          TCP_Write(sock, buffer, 0);
-        }
-        if (index != stop) {
-          TCP_Write(sock, ", ", 0);
-        }
-        current = current->next;
-        index++;
-      }
-
-      pthread_rwlock_unlock(&list->rwlock);
-      TCP_Write(sock, "\n", 0);
+      free(buffer); // buffer was allocated on heap by ToString
     } else {
-      TCP_Write(sock, MSG("KEY_NOT_FOUND"), 0);
+      TCP_Write(sock, MSG("KEY_NOT_FOUND"), 1);
     }
   } else if (strcmp(cmd->command, "LOAD") == 0) {
     if (Import_Snapshot(context, "snapshot.bin") == 0) {

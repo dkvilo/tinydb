@@ -34,7 +34,7 @@ DB_Atomic_Get(Database* db, const char* key)
   if (entry != NULL)
     return *entry;
   return (DatabaseEntry){ .type = DB_ENTRY_STRING,
-                          .value = { .string = "null" } };
+                          .value = { .string = { .value = "null" } } };
 }
 
 int64_t
