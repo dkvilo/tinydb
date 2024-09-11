@@ -1,7 +1,7 @@
 #ifndef __TINY_DB_SNAPSHOT
 #define __TINY_DB_SNAPSHOT
 
-#include "tinydb.h"
+#include "tinydb_context.h"
 
 #define TINYDB_SIGNATURE "TINYDB"
 #define TINYDB_VERSION "0.0.1"

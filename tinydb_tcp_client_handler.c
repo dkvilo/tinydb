@@ -5,7 +5,8 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-#include "tinydb.h"
+#include "tinydb_database.h"
+#include "tinydb_context.h"
 #include "tinydb_log.h"
 #include "tinydb_tcp_client_handler.h"
 #include "tinydb_query_parser.h"

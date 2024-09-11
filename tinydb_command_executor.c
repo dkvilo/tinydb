@@ -4,10 +4,12 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "tinydb.h"
+#include "tinydb_database.h"
 #include "tinydb_command_executor.h"
 #include "tinydb_log.h"
 #include "tinydb_snapshot.h"
+#include "tinydb_atomic_proc.h"
+#include "tinydb_list.h"
 
 #define RESPONSE_OK "Ok\n"
 #define RESPONSE_FAILED "FAILED\n"
@@ -179,25 +181,12 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
       TCP_Write(sock, MSG("USAGE_INC"), 0);
       return;
     }
-    DatabaseEntry res = DB_Atomic_Get(db, key);
-    // if (res.type == DB_ENTRY_NUMBER) {
-    if (res.value.number.value || res.value.number.value == 0) {
-      res.value.number.value++;
-      DB_Atomic_Store(db, key, res.value, DB_ENTRY_NUMBER);
 
-      char as_number[20];
-      sprintf(as_number, "%" PRId64 "\n", res.value.number.value);
-      TCP_Write(sock, as_number, 0);
-    } else {
-      DB_Value new_val;
-      new_val.number.value = 1;
-      DB_Atomic_Store(db, key, new_val, DB_ENTRY_NUMBER);
-      TCP_Write(sock, "1\n", 0);
-    }
-    // }
-    //  else {
-    //   DB_Log(DB_LOG_WARNING, "Not an number!");
-    // }
+    int64_t result = DB_Atomic_Incr(db, key);
+
+    char as_number[20];
+    sprintf(as_number, "%" PRId64 "\n", result);
+    TCP_Write(sock, as_number, 0);
 
   } else if (strcmp(cmd->command, "EXPORT") == 0) {
     const char* key = cmd->argv[0];
@@ -450,8 +439,7 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
     } else {
       TCP_Write(sock, MSG("KEY_NOT_FOUND"), 0);
     }
-  }
-  else if (strcmp(cmd->command, "LOAD") == 0) {
+  } else if (strcmp(cmd->command, "LOAD") == 0) {
     if (Import_Snapshot(context, "snapshot.bin") == 0) {
       DB_Log(DB_LOG_INFO, "SNAPSHOT was loaded successfully");
     }

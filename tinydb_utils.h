@@ -4,7 +4,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 
-#include "tinydb.h"
+#include "tinydb_database.h"
 
 void
 DB_Utils_Save_To_File(Database* db, const char* filename);
