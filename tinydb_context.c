@@ -1,4 +1,4 @@
-#include "tinydb.h"
+#include "tinydb_context.h"
 #include "tinydb_hash.h"
 #include "tinydb_log.h"
 #include "tinydb_snapshot.h"
@@ -64,33 +64,6 @@ Cleanup_Partial_Context(RuntimeContext* context, int32_t num_initialized_dbs)
 }
 
 void
-Initialize_Database(Database* db)
-{
-  for (int i = 0; i < NUM_SHARDS; i++) {
-    db->shards[i].entries = HM_Create();
-    if (db->shards[i].entries == NULL) {
-      DB_Log(DB_LOG_ERROR, "Failed to create hash map for shard %d", i);
-      for (int j = 0; j < i; j++) {
-        HM_Destroy(db->shards[j].entries);
-        pthread_rwlock_destroy(&db->shards[j].rwlock);
-      }
-      return;
-    }
-    db->shards[i].num_entries = 0;
-
-    if (pthread_rwlock_init(&db->shards[i].rwlock, NULL) != 0) {
-      DB_Log(DB_LOG_ERROR, "Error initializing rwlock for shard %d", i);
-      for (int j = 0; j <= i; j++) {
-        HM_Destroy(db->shards[j].entries);
-        if (j < i)
-          pthread_rwlock_destroy(&db->shards[j].rwlock);
-      }
-      return;
-    }
-  }
-}
-
-void
 Free_Context(RuntimeContext* context)
 {
   if (context == NULL)
@@ -117,43 +90,3 @@ Free_Context(RuntimeContext* context)
   free(context);
 }
 
-int32_t
-Pick_Shard(const char* key)
-{
-  uint64_t hash = DJB2_Hash_String(key);
-  return hash & (NUM_SHARDS - 1);
-}
-
-void
-DB_Atomic_Store(Database* db,
-                const char* key,
-                DB_Value value,
-                DB_ENTRY_TYPE type)
-{
-  int32_t shard_id = Pick_Shard(key);
-  DatabaseShard* shard = &db->shards[shard_id];
-
-  DatabaseEntry* new_entry = (DatabaseEntry*)malloc(sizeof(DatabaseEntry));
-  new_entry->key = strdup(key);
-  new_entry->value = value;
-  new_entry->type = type;
-  int8_t state = HM_Put(shard->entries, new_entry->key, new_entry);
-
-  if (state == HM_ACTION_FAILED) {
-    free(new_entry->key);
-    free(new_entry);
-  } else if (state == HM_ACTION_ADDED) {
-    atomic_fetch_add(&shard->num_entries, 1);
-  }
-}
-
-DatabaseEntry
-DB_Atomic_Get(Database* db, const char* key)
-{
-  int32_t shard_id = Pick_Shard(key);
-  DatabaseShard* shard = &db->shards[shard_id];
-  DatabaseEntry* entry = HM_Get(shard->entries, key);
-
-  if (entry != NULL) return *entry;
-  return (DatabaseEntry){ .type = DB_ENTRY_STRING, .value = { .string = "null" } };
-}

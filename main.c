@@ -10,7 +10,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "tinydb.h"
+#include "tinydb_context.h"
 #include "tinydb_utils.h"
 #include "tinydb_log.h"
 #include "tinydb_tcp_server.h"
@@ -26,7 +26,9 @@ void
 After_Exit_Hook()
 {
   DB_Log(DB_LOG_INFO, "BYE");
+#if 0
   Export_Snapshot(context, DEFAULT_EXIT_SNAPSHOT_NAME);
+#endif
 }
 
 void
