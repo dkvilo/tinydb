@@ -115,7 +115,9 @@ create_node_string(HPLinkedList* list, const char* value)
 
   size_t value_length = strlen(value);
   if (value_length > MAX_STRING_LENGTH) {
-    DB_Log(DB_LOG_WARNING, "CREATE_NODE_STRING Buffer was way too long. Current Max=%d", MAX_STRING_LENGTH); 
+    DB_Log(DB_LOG_WARNING,
+           "CREATE_NODE_STRING Buffer was way too long. Current Max=%d",
+           MAX_STRING_LENGTH);
     return NULL;
   }
 
@@ -299,6 +301,7 @@ HPList_LPop(HPLinkedList* list)
   return node;
 }
 
+// temporary solution, we will convert to bytes in future
 char*
 HPList_ToString(HPLinkedList* list)
 {
@@ -353,6 +356,95 @@ HPList_ToString(HPLinkedList* list)
     }
 
     current = current->next;
+  }
+
+  *ptr++ = ']';
+  *ptr = '\0';
+
+  pthread_rwlock_unlock(&list->rwlock);
+  return buffer;
+}
+
+// temporary solution, we will convert to bytes in future
+char*
+HPList_RangeToString(HPLinkedList* list, int32_t start, int32_t stop)
+{
+  if (stop > list->count || stop > list->count)
+  {
+    stop = list->count;
+  }
+
+  if (!list || list->count == 0 || start >= list->count || start > stop) {
+    return strdup("[]");
+  }
+
+  pthread_rwlock_rdlock(&list->rwlock);
+
+  // first pass: calculate the buffer size
+  size_t buffer_size = 2; // for '[' and ']'
+  ListNode* current = list->head;
+  int index = 0;
+
+  // skip to the starting index
+  while (current && index < start) {
+    current = current->next;
+    index++;
+  }
+
+  // iterate through the range [start, stop]
+  while (current && index <= stop) {
+    if (index != start) {
+      buffer_size += 2; // for ", "
+    }
+
+    if (current->type == TYPE_STRING) {
+      buffer_size += strlen(current->value.string_value) + 2; // +2 for quotes
+    } else if (current->type == TYPE_INT) {
+      buffer_size += snprintf(NULL, 0, "%" PRId64, current->value.int_value);
+    } else if (current->type == TYPE_FLOAT) {
+      buffer_size += snprintf(NULL, 0, "%f", current->value.float_value);
+    }
+
+    current = current->next;
+    index++;
+  }
+
+  buffer_size++; // reserve for null terminator
+  char* buffer = (char*)malloc(buffer_size);
+  if (!buffer) {
+    pthread_rwlock_unlock(&list->rwlock);
+    return NULL;
+  }
+
+  // second pass: fill the buffer
+  char* ptr = buffer;
+  *ptr++ = '[';
+
+  // reset index and current node to starting point
+  current = list->head;
+  index = 0;
+  while (current && index < start) {
+    current = current->next;
+    index++;
+  }
+
+  // iterate through the range [start, stop] and fill the buffer
+  while (current && index <= stop) {
+    if (index != start) {
+      *ptr++ = ',';
+      *ptr++ = ' ';
+    }
+
+    if (current->type == TYPE_STRING) {
+      ptr += sprintf(ptr, "\"%s\"", current->value.string_value);
+    } else if (current->type == TYPE_INT) {
+      ptr += sprintf(ptr, "%" PRId64, current->value.int_value);
+    } else if (current->type == TYPE_FLOAT) {
+      ptr += sprintf(ptr, "%f", current->value.float_value);
+    }
+
+    current = current->next;
+    index++;
   }
 
   *ptr++ = ']';
