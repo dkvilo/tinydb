@@ -22,7 +22,10 @@
 // number of initial databases to be initalized by default on startup
 #define NUM_INITAL_DATABASES 1
 
-// NUM_SHARDS must be a power of 2 (e.g., 2, 4, 8, 16, 32 ...)
+// this must be a power of 2 (e.g., 2, 4, 8, 16, 32 ...)
 #define NUM_SHARDS 16
+
+// max size of string buffer size in the list (1 MiB)
+#define MAX_STRING_LENGTH 1000000
 
 #endif // __TINY_DB_CONFIG

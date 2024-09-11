@@ -47,14 +47,9 @@ trim_quotes(char* str)
 ParsedCommand*
 Parse_Command(const char* input)
 {
-  ParsedCommand* cmd = malloc(sizeof(ParsedCommand));
+  ParsedCommand* cmd = calloc(1, sizeof(ParsedCommand));
   if (!cmd)
     return NULL;
-
-  cmd->command = NULL;
-  cmd->argc = 0;
-  memset(cmd->argv, 0, sizeof(cmd->argv));
-  memset(cmd->types, 0, sizeof(cmd->types));
 
   char* input_copy = strdup(input);
   if (!input_copy) {
@@ -62,56 +57,60 @@ Parse_Command(const char* input)
     return NULL;
   }
 
-  char* token = strtok(input_copy, " ");
+  char* saveptr;
+  char* token = strtok_r(input_copy, " ", &saveptr);
   if (token) {
     cmd->command = strdup(token);
+    if (!cmd->command)
+      goto cleanup;
   }
 
-  char* rest = strtok(NULL, "");
-  if (rest) {
-    char* key = strtok(rest, " ");
-    if (key) {
-      cmd->argv[cmd->argc] = strdup(key);
-      cmd->types[cmd->argc] = TOKEN_STRING;
-      cmd->argc++;
+  char* key = strtok_r(NULL, " ", &saveptr);
+  if (key) {
+    cmd->argv[cmd->argc] = strdup(key);
+    if (!cmd->argv[cmd->argc])
+      goto cleanup;
+    cmd->types[cmd->argc] = TOKEN_STRING;
+    cmd->argc++;
 
-      char* value = strtok(NULL, "");
-      if (value) {
-        while (*value == ' ')
-          value++;
-
-        if (value[0] == '"') {
-          char* end_quote = strrchr(value, '"');
-          if (end_quote) {
-            *end_quote = '\0';
-            cmd->argv[cmd->argc] = strdup(value + 1);
-          } else {
-            cmd->argv[cmd->argc] = strdup(value);
-          }
+    char* value = strtok_r(NULL, "", &saveptr);
+    if (value) {
+      while (*value == ' ')
+        value++;
+      if (value[0] == '"') {
+        char* end_quote = strrchr(value, '"');
+        if (end_quote) {
+          *end_quote = '\0';
+          cmd->argv[cmd->argc] = strdup(value + 1);
         } else {
           cmd->argv[cmd->argc] = strdup(value);
         }
-        cmd->types[cmd->argc] = detect_token_type(cmd->argv[cmd->argc]);
-        cmd->argc++;
+      } else {
+        cmd->argv[cmd->argc] = strdup(value);
       }
+      if (!cmd->argv[cmd->argc])
+        goto cleanup;
+      cmd->types[cmd->argc] = detect_token_type(cmd->argv[cmd->argc]);
+      cmd->argc++;
     }
   }
 
   free(input_copy);
   return cmd;
+
+cleanup:
+  Free_Parsed_Command(cmd);
+  free(input_copy);
+  return NULL;
 }
 
 void
 Free_Parsed_Command(ParsedCommand* cmd)
 {
   if (cmd) {
-    if (cmd->command) {
-      free(cmd->command);
-    }
+    free(cmd->command);
     for (int i = 0; i < cmd->argc; i++) {
-      if (cmd->argv[i]) {
-        free(cmd->argv[i]);
-      }
+      free(cmd->argv[i]);
     }
     free(cmd);
   }

@@ -7,11 +7,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MEMORY_POOL_SIZE 1024
+#define MEMORY_POOL_SIZE 4096
 
 typedef struct MemoryBlock
 {
   char* memory;
+  size_t size;
   size_t used;
   struct MemoryBlock* next;
 } MemoryBlock;
@@ -28,7 +29,11 @@ Memory_Pool_Init(MemoryPool* pool);
 void
 Memory_Pool_Destroy(MemoryPool* pool);
 
-char*
+void*
 Memory_Pool_Alloc(MemoryPool* pool, size_t size);
+
+void
+Memory_Pool_Free(MemoryPool* pool,
+                 void* ptr);
 
 #endif // __TINY_DB_MEMORY_POOL

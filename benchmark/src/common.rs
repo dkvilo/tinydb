@@ -36,7 +36,7 @@ pub fn parse_arguments() -> Config {
     let port = args.get(2).map_or(8079, |v| v.parse().unwrap_or(8079));
     let operation_type = args.get(3).map_or("set".to_string(), |v| v.clone());
     let num_clients = args.get(4).map_or(50, |v| v.parse().unwrap_or(50));
-    let num_operations = args.get(5).map_or(2000000, |v| v.parse().unwrap_or(2000000));
+    let num_operations = args.get(5).map_or(1000000, |v| v.parse().unwrap_or(1000000));
 
     Config {
         host,

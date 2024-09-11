@@ -1,3 +1,10 @@
+/**
+ * /COLLISION HANDLING/
+ *    when collision happens we are using quadratic probing to find a free index
+ *    because of the nature of quadratic probing algorithm to keep it reasonably performant
+ *    we need to make sure that size of the buffer is always power of 2 when we are creating/resizing the buffer.
+ *    - David K.
+ */
 #include "tinydb_hashmap.h"
 #include "tinydb_log.h"
 
@@ -9,13 +16,14 @@ hash(const char* key, size_t capacity)
     hash = (hash * 31) + *key;
     key++;
   }
-  return hash % capacity;
+
+  return hash & (capacity - 1);
 }
 
 static size_t
 Quad_Probe(size_t index, size_t i, size_t cap)
 {
-  return (index + i * i) % cap;
+  return (index + i * i) & (cap - 1);
 }
 
 HashMap*
@@ -127,7 +135,7 @@ resize_if_needed(HashMap* map)
 
   pthread_mutex_lock(&map->resize_lock);
 
-  size_t new_capacity = map->capacity * 2;
+  size_t new_capacity = map->capacity << 1; // double the capacity (always power of 2)
   HashEntry* new_entries = (HashEntry*)calloc(new_capacity, sizeof(HashEntry));
   pthread_rwlock_t* new_locks =
     (pthread_rwlock_t*)malloc(new_capacity * sizeof(pthread_rwlock_t));

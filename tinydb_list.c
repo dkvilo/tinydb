@@ -2,11 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
 #include "tinydb_list.h"
+#include "tinydb_log.h"
 #include "tinydb_utils.h"
-
-#define NODE_POOL_BLOCK_SIZE 1024
-#define STRING_POOL_BLOCK_SIZE 4096
 
 HPLinkedList*
 HPList_Create()
@@ -111,16 +110,32 @@ create_node_float(HPLinkedList* list, double value)
 ListNode*
 create_node_string(HPLinkedList* list, const char* value)
 {
-  ListNode* node = reuse_or_create_node(list);
-  if (!node)
+  if (!value)
     return NULL;
-  char* new_value =
-    (char*)Memory_Pool_Alloc(&list->string_pool, strlen(value) + 1);
-  if (!new_value) {
+
+  size_t value_length = strlen(value);
+  if (value_length > MAX_STRING_LENGTH) {
+    DB_Log(DB_LOG_WARNING, "CREATE_NODE_STRING Buffer was way too long. Current Max=%d", MAX_STRING_LENGTH); 
     return NULL;
   }
 
-  strcpy(new_value, value);
+  ListNode* node = reuse_or_create_node(list);
+  if (!node)
+    return NULL;
+
+  char* new_value =
+    (char*)Memory_Pool_Alloc(&list->string_pool, value_length + 1);
+  if (!new_value) {
+    DB_Log(DB_LOG_WARNING, "CREATE_NODE_STRING Memory allocation failed");
+    if (list->freed_node_count < MAX_FREED_NODES) {
+      list->freed_nodes[list->freed_node_count++] = node;
+    }
+    return NULL;
+  }
+
+  strncpy(new_value, value, value_length);
+  new_value[value_length] = '\0';
+
   node->type = TYPE_STRING;
   node->value.string_value = new_value;
   node->next = node->prev = NULL;
@@ -293,42 +308,56 @@ HPList_ToString(HPLinkedList* list)
 
   pthread_rwlock_rdlock(&list->rwlock);
 
-  size_t buffer_size = 1024;
-  size_t buffer_len = 0;
-  char* buffer = (char*)malloc(buffer_size);
-  buffer[0] = '\0';
-
-  Append_To_Buffer(&buffer, "[", &buffer_size, &buffer_len);
-
+  // first pass: calculate the buffer size
+  size_t buffer_size = 2; // for '[' and ']'
   ListNode* current = list->head;
   while (current) {
-    char value_buffer[128];
-    if (current->type == TYPE_STRING) {
-      snprintf(value_buffer,
-               sizeof(value_buffer),
-               "\"%s\"",
-               current->value.string_value);
-    } else if (current->type == TYPE_INT) {
-      snprintf(value_buffer,
-               sizeof(value_buffer),
-               "%" PRId64,
-               current->value.int_value);
-    } else if (current->type == TYPE_FLOAT) {
-      snprintf(
-        value_buffer, sizeof(value_buffer), "%f", current->value.float_value);
+    if (current != list->head) {
+      buffer_size += 2; // for ", "
     }
 
-    Append_To_Buffer(&buffer, value_buffer, &buffer_size, &buffer_len);
-    if (current->next) {
-      Append_To_Buffer(&buffer, ", ", &buffer_size, &buffer_len);
+    if (current->type == TYPE_STRING) {
+      buffer_size += strlen(current->value.string_value) + 2; // +2 for quotes
+    } else if (current->type == TYPE_INT) {
+      buffer_size += snprintf(NULL, 0, "%" PRId64, current->value.int_value);
+    } else if (current->type == TYPE_FLOAT) {
+      buffer_size += snprintf(NULL, 0, "%f", current->value.float_value);
+    }
+
+    current = current->next;
+  }
+  buffer_size++; // reserve for null terminator
+  char* buffer = (char*)malloc(buffer_size);
+  if (!buffer) {
+    pthread_rwlock_unlock(&list->rwlock);
+    return NULL;
+  }
+
+  // second pass: fill the buffer
+  char* ptr = buffer;
+  *ptr++ = '[';
+
+  current = list->head;
+  while (current) {
+    if (current != list->head) {
+      *ptr++ = ',';
+      *ptr++ = ' ';
+    }
+
+    if (current->type == TYPE_STRING) {
+      ptr += sprintf(ptr, "\"%s\"", current->value.string_value);
+    } else if (current->type == TYPE_INT) {
+      ptr += sprintf(ptr, "%" PRId64, current->value.int_value);
+    } else if (current->type == TYPE_FLOAT) {
+      ptr += sprintf(ptr, "%f", current->value.float_value);
     }
 
     current = current->next;
   }
 
-  Append_To_Buffer(&buffer, "]", &buffer_size, &buffer_len);
+  *ptr++ = ']';
+  *ptr = '\0';
 
   pthread_rwlock_unlock(&list->rwlock);
-
   return buffer;
 }
