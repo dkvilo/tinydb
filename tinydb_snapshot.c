@@ -24,11 +24,30 @@ write_string(FILE* file, const char* str)
 }
 
 char*
-read_string_mmap(char** ptr)
+read_string_mmap(char** ptr, char* end_of_mapped_region)
 {
+  // make sure that we have enough space to read the length
+  if (*ptr + sizeof(uint32_t) > end_of_mapped_region) {
+    DB_Log(DB_LOG_ERROR, "Invalid memory access: string length exceeds mmap");
+    return NULL;
+  }
+
   uint32_t len = *(uint32_t*)(*ptr); // read the length
   *ptr += sizeof(uint32_t); // move the pointer forward by the size of uint32_t
+
+  // check if the length is reasonable size
+  if (len > MAX_STRING_LENGTH) {
+    DB_Log(DB_LOG_ERROR, "Invalid string length: %u", len);
+    return NULL;
+  }
+
   if (len == 0) {
+    return NULL;
+  }
+
+  // make sure that we have enough space to read the string data
+  if (*ptr + len > end_of_mapped_region) {
+    DB_Log(DB_LOG_ERROR, "Invalid memory access: string content exceeds mmap");
     return NULL;
   }
 
@@ -174,12 +193,13 @@ Import_Snapshot(RuntimeContext* ctx, const char* filename)
     return -1;
   }
 
-  // file pointer to track position in memory-mapped data
   char* ptr = data;
+  char* end_of_mapped_region =
+    data + st.st_size; // calculate the end of the region
 
-  // Read and verify header
-  char* signature = read_string_mmap(&ptr);
-  char* version = read_string_mmap(&ptr);
+  // read and verify header
+  char* signature = read_string_mmap(&ptr, end_of_mapped_region);
+  char* version = read_string_mmap(&ptr, end_of_mapped_region);
 
   if (strcmp(signature, TINYDB_SIGNATURE) != 0 ||
       strcmp(version, TINYDB_VERSION) != 0) {
@@ -192,7 +212,7 @@ Import_Snapshot(RuntimeContext* ctx, const char* filename)
   }
 
   DB_Log(
-    DB_LOG_INFO, "Importing TinyDB Snapshot for version %s", TINYDB_VERSION);
+    DB_LOG_INFO, "Importing TinyDB snapshot for version %s", TINYDB_VERSION);
 
   free(signature);
   free(version);
@@ -200,6 +220,13 @@ Import_Snapshot(RuntimeContext* ctx, const char* filename)
   // number of databases
   int32_t num_databases = *(int32_t*)ptr;
   ptr += sizeof(int32_t);
+
+  if (ptr > end_of_mapped_region) {
+    DB_Log(DB_LOG_ERROR, "Reached beyond the end of the mapped file.");
+    munmap(data, st.st_size);
+    close(fd);
+    return -1;
+  }
 
   // clean up old databases
   if (ctx->db_manager.databases) {
@@ -228,7 +255,7 @@ Import_Snapshot(RuntimeContext* ctx, const char* filename)
     db->ID = *(EntryID*)ptr;
     ptr += sizeof(EntryID);
 
-    db->name = read_string_mmap(&ptr);
+    db->name = read_string_mmap(&ptr, end_of_mapped_region);
 
     for (int32_t j = 0; j < NUM_SHARDS; j++) {
       DatabaseShard* shard = &db->shards[j];
@@ -253,7 +280,7 @@ Import_Snapshot(RuntimeContext* ctx, const char* filename)
           return -1;
         }
 
-        entry->key = read_string_mmap(&ptr);
+        entry->key = read_string_mmap(&ptr, end_of_mapped_region);
 
         entry->type = *(DB_ENTRY_TYPE*)ptr;
         ptr += sizeof(DB_ENTRY_TYPE);
@@ -264,7 +291,8 @@ Import_Snapshot(RuntimeContext* ctx, const char* filename)
             ptr += sizeof(int64_t);
             break;
           case DB_ENTRY_STRING:
-            entry->value.string.value = read_string_mmap(&ptr);
+            entry->value.string.value =
+              read_string_mmap(&ptr, end_of_mapped_region);
             break;
 
           case DB_ENTRY_LIST: {
@@ -278,7 +306,8 @@ Import_Snapshot(RuntimeContext* ctx, const char* filename)
 
               switch (node_type) {
                 case TYPE_STRING: {
-                  char* str_value = read_string_mmap(&ptr);
+                  char* str_value =
+                    read_string_mmap(&ptr, end_of_mapped_region);
                   HPList_RPush_String(list, str_value);
                   free(str_value);
                 } break;
@@ -342,7 +371,7 @@ Import_Snapshot(RuntimeContext* ctx, const char* filename)
     user->ID = *(EntryID*)ptr;
     ptr += sizeof(EntryID);
 
-    user->name = read_string_mmap(&ptr);
+    user->name = read_string_mmap(&ptr, end_of_mapped_region);
 
     memcpy(user->password, ptr, 32);
     ptr += 32;
