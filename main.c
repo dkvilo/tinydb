@@ -1,8 +1,5 @@
 /**
- * @author David Kviloria
- * 
- * main.c
- * 
+ * TinyDB by David Kviloria <david@skystargames.com>
  */
 #include <signal.h>
 #include <stdio.h>
@@ -11,16 +8,15 @@
 #include <unistd.h>
 
 #include "tinydb_context.h"
-#include "tinydb_utils.h"
-#include "tinydb_log.h"
-#include "tinydb_tcp_server.h"
-#include "tinydb_thread_pool.h"
 #include "tinydb_hash.h"
+#include "tinydb_log.h"
 #include "tinydb_snapshot.h"
 #include "tinydb_tcp_client_handler.h"
+#include "tinydb_tcp_server.h"
+#include "tinydb_thread_pool.h"
 
-Database *db = NULL;
-RuntimeContext *context = NULL;
+Database* db = NULL;
+RuntimeContext* context = NULL;
 
 void
 After_Exit_Hook()
@@ -34,23 +30,38 @@ After_Exit_Hook()
 void
 Signal_Handler(int signum)
 {
-  DB_Log(DB_LOG_INFO, "Interrupt signal (%d) received. Exiting gracefully...", signum);
-  exit(0);
+  DB_Log(DB_LOG_INFO,
+         "Interrupt signal (%d) received. Exiting gracefully...",
+         signum);
+  exit(EXIT_SUCCESS);
 }
 
-void log_tinydb_ascii_art() {
-  const char* tinydb_ascii_art = 
-  "       _          _          _           _        _       _            _       \n"
-  "      /\\ \\       /\\ \\       /\\ \\     _  /\\ \\     /\\_\\    /\\ \\         / /\\     \n"
-  "      \\_\\ \\      \\ \\ \\     /  \\ \\   /\\_\\\\ \\ \\   / / /   /  \\ \\____   / /  \\    \n"
-  "      /\\__ \\     /\\ \\_\\   / /\\ \\ \\_/ / / \\ \\ \\_/ / /   / /\\ \\_____\\ / / /\\ \\   \n"
-  "     / /_ \\ \\   / /\\/_/  / / /\\ \\___/ /   \\ \\___/ /   / / /\\/___  // / /\\ \\ \\  \n"
-  "    / / /\\ \\ \\ / / /    / / /  \\/____/     \\ \\ \\_/   / / /   / / // / /\\ \\_\\ \\ \n"
-  "   / / /  \\/_// / /    / / /    / / /       \\ \\ \\   / / /   / / // / /\\ \\ \\___\\\n"
-  "  / / /      / / /    / / /    / / /         \\ \\ \\ / / /   / / // / /  \\ \\ \\__/ \n"
-  " / / /   ___/ / /__  / / /    / / /           \\ \\ \\\\ \\ \\__/ / // / /____\\_\\ \\   \n"
-  "/_/ /   /\\__/\\/_/__\\/ / /    / / /             \\ \\_\\\\ \\___\\ / // / /__________\\ \n"
-  "\\_\\/    \\/_________/\\/ /     \\/_/               \\/_/ \\/_____/ \\/_____________/ \n";
+void
+log_tinydb_ascii_art()
+{
+  const char* tinydb_ascii_art =
+    "       _          _          _           _        _       _            _  "
+    "     \n"
+    "      /\\ \\       /\\ \\       /\\ \\     _  /\\ \\     /\\_\\    /\\ \\ "
+    "        / /\\     \n"
+    "      \\_\\ \\      \\ \\ \\     /  \\ \\   /\\_\\\\ \\ \\   / / /   /  "
+    "\\ \\____   / /  \\    \n"
+    "      /\\__ \\     /\\ \\_\\   / /\\ \\ \\_/ / / \\ \\ \\_/ / /   / /\\ "
+    "\\_____\\ / / /\\ \\   \n"
+    "     / /_ \\ \\   / /\\/_/  / / /\\ \\___/ /   \\ \\___/ /   / / /\\/___  "
+    "// / /\\ \\ \\  \n"
+    "    / / /\\ \\ \\ / / /    / / /  \\/____/     \\ \\ \\_/   / / /   / / "
+    "// / /\\ \\_\\ \\ \n"
+    "   / / /  \\/_// / /    / / /    / / /       \\ \\ \\   / / /   / / // / "
+    "/\\ \\ \\___\\\n"
+    "  / / /      / / /    / / /    / / /         \\ \\ \\ / / /   / / // / /  "
+    "\\ \\ \\__/ \n"
+    " / / /   ___/ / /__  / / /    / / /           \\ \\ \\\\ \\ \\__/ / // / "
+    "/____\\_\\ \\   \n"
+    "/_/ /   /\\__/\\/_/__\\/ / /    / / /             \\ \\_\\\\ \\___\\ / // "
+    "/ /__________\\ \n"
+    "\\_\\/    \\/_________/\\/ /     \\/_/               \\/_/ \\/_____/ "
+    "\\/_____________/ \n";
 
   printf("\n%s\n", tinydb_ascii_art);
 }
@@ -67,10 +78,10 @@ main(int argc, char const* argv[])
   Thread_Pool_Init();
   DB_Log(DB_LOG_INFO, "Thread Pool has been created.");
 
-  context = Initialize_Context(NUM_INITAL_DATABASES, DEFAULT_SNAPSHOT_NAME);
+  context = Initialize_Context(NUM_INITAL_DATABASES+2, DEFAULT_SNAPSHOT_NAME);
   DB_Log(DB_LOG_INFO, "RuntimeContext has been allocated and initialized.");
 
-#if 0
+#if 1
   context->user_manager.users = (DB_User*) malloc(sizeof(DB_User));
   context->user_manager.users[0].ID = 0;
   context->user_manager.users[0].name = "default";
@@ -95,8 +106,8 @@ main(int argc, char const* argv[])
   DB_Log(DB_LOG_INFO, "TCP Server has been initialized.", db->name);
   DB_Log(DB_LOG_INFO, " - Host: %s", "127.0.0.1");
   DB_Log(DB_LOG_INFO, " - Port: %d", PORT);
-  
+
   TCP_Server_Process_Connections(&tcp_server, &tcp_client, TCP_Client_Handler);
-  
+
   return 0;
 }

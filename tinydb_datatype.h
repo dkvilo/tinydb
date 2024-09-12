@@ -1,8 +1,9 @@
 #ifndef __TINY_DB_DATATYPE
 #define __TINY_DB_DATATYPE
 
-#include "tinydb_list.h"
 #include <stdatomic.h>
+#include "tinydb_list.h"
+#include "tinydb_hashmap.h"
 
 typedef uint64_t EntryID;
 
@@ -26,14 +27,14 @@ typedef struct DB_String
 
 typedef struct DB_Object
 {
-  void* value;
+  HashMap* fields;
 } DB_Object;
 
 typedef union
 {
   DB_Number number;
   DB_String string;
-  DB_Object object;
+  DB_Object *object;
   HPLinkedList* list;
 } DB_Value;
 

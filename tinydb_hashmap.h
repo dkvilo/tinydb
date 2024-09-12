@@ -14,7 +14,8 @@
 #define LOAD_FACTOR_THRESHOLD 0.75
 
 // note (David) for very large hashmaps, bigger increment could be more
-// efficient. we can make it adaptive based on the current size of the hash map tho
+// efficient. we can make it adaptive based on the current size of the hash map
+// tho
 #define RESIZE_WORK_INCREMENT 64
 
 #define HM_ACTION_FAILED -1

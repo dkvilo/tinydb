@@ -28,6 +28,8 @@ The following table highlights the results of a stress test involving **1 millio
 | **Redis (Raw Socket)**     | 17.82 seconds        | 56,118 ops/sec      | `allkeys-lru`     | 6 GB           | Raw Socket        |
 | **Tiny DB (Sharded)**      | 14.85 seconds        | 67,340 ops/sec      | Sharding (16 Buckets) | N/A         | Raw Socket        |
 
+Stress scripts that were used for this benchmark [Link](https://github.com/dkvilo/tinydb/commit/75d75cdd4d34324ba211b7b65a9cdd4a2a76fd8c)
+
 # Usage
 
 ### Build from source
@@ -50,17 +52,32 @@ To connect the server:
 nc host port
 ```
 
-Or you can use libs/libtinydb.js simple client implementation for NodeJs
+Or use benchmark program and/or example project that implements client library (for testing).
 
-## Commands
+## Commands and Data Structures
 
-| **Command**            | 
-|------------------------|
-| `SET <key> <value>`     |
-| `GET <key>`             |
-| `APPEND <key> <value>`  |
-| `STRLEN <key>`          |
-| `EXPORT snapshot.bin`   |
+| **Data Structures**           |  **Types**           |
+|-------------------------------|----------------------|
+| `List`                        | String, Number       |
+| `Object`                      | String, Number, List |
+| `Number`                      | Int64, Double        |
+| `String`                      | uint8*               |
+
+| **Command**                   |
+|-------------------------------|
+| `SET <key> <value>`           |
+| `GET <key>`                   |
+| `APPEND <key> <value>`        |
+| `STRLEN <key>`                |
+| `INCR <key>`                  |
+| `RPUSH <key> <value>`         |
+| `LPUSH <key> <value>`         |
+| `RPOP <key>`                  |
+| `LPOP <key>`                  |
+| `LRANGE <key> <start> <stop>` |
+| `LLEN <key>`                  |
+| `EXPORT snapshot.bin`         |
+| `INSP`                        |
 
 
 By default, the server will bind to all available interfaces ```INADDR_ANY``` and listen on the specified port ```PORT``` (config.h).

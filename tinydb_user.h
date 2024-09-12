@@ -11,7 +11,7 @@ typedef struct DB_User
   EntryID ID;
 
   char* name;
-  char password[32];
+  uint8_t password[32];
 
   DB_Access* access;
 } DB_User;
