@@ -1,33 +1,26 @@
 /*
-    this is for testing, we will not use text format for sending commands and receiving response from server,
+    This is for testing, we will not use text format for sending commands and receiving response from server,
     we need to design binary protocol that will be faster to send and process,
     for example command packet could look like this:
 
-    +-------------+------------+------------------+--------------+--------------------+
     | Command ID  | Key Length | Key              | Value Length |     Value          |
-    +-------------+------------+------------------+--------------+--------------------+
+    |-------------|------------|------------------|--------------|--------------------|
     | 1 byte      | 4 bytes    | Variable         | 4 bytes      |    Variable        |
-    +-------------+------------+------------------+--------------+--------------------+
 
-    0x01 – SET
-    0x02 – GET
-    0x03 – LRANGE
-    0x04 – INCR
-    0x05 – RPOP
+    | Byte | Length | Name   |
+    |------|--------|--------|
+    | 0x01 | 4      | SET\0  |
+    | 0x02 | 4      | GET\0  |
     
     etc ...
 
-
     Response packet example:
 
-    +--------------+--------------+--------------+
     | Response Type| Data Length  | Response Data|
-    +--------------+--------------+--------------+
+    |--------------|--------------|--------------|
     | 1 byte       | 4 bytes      | Variable     |
-    +--------------+--------------+--------------+
 
-
-    David K.
+    - David
 */
 use std::io::{BufReader, BufRead, Write};
 use std::net::TcpStream;
