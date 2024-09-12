@@ -15,20 +15,23 @@
 **Num Operations**: 1 Million  
 **Num Clients**: 50
 
-| **System**                | **Time to Complete** | **Ops per Second** | **Memory Policy** | **Persistence**   | **Max Memory** | **Max Clients** | **Optimizations**           | **Benchmark File Path**                        |
-|---------------------------|----------------------|--------------------|-------------------|-------------------|----------------|----------------|-----------------------------|------------------------------------------------|
-| **Redis (with `redis-py`)**| 26.06 seconds        | 38,372 ops/sec      | `allkeys-lru`     | Disabled (AOF: no) | 6 GB           | 1000           | Default                      | `redis_benchmark.py`                           |
-| **Redis (without `redis-py`)** | 17.82 seconds      | 56,118 ops/sec      | `allkeys-lru`     | Disabled (AOF: no) | 6 GB           | 1000           | Raw Socket (RESP Encoding)   | `redis_raw_socket.py`                          |
-| **Tiny DB**               | 14.85 seconds        | 67,340 ops/sec      | Num Shards 16      | N/A               | N/A            | N/A            | Raw Socket                   | `tinydb_benchmark.py`                          |
+Original stress scripts that were used for this benchmark [Link](https://github.com/dkvilo/tinydb/commit/75d75cdd4d34324ba211b7b65a9cdd4a2a76fd8c)
 
+| **System**                     | **Time to Complete** | **Ops per Second** | **Memory Policy** | **Persistence**    | **Max Memory** | **Max Clients** | **Optimizations**          | **Benchmark File Path** |
+| ------------------------------ | -------------------- | ------------------ | ----------------- | ------------------ | -------------- | --------------- | -------------------------- | ----------------------- |
+| **Redis (with `redis-py`)**    | 26.06 seconds        | 38,372 ops/sec     | `allkeys-lru`     | Disabled (AOF: no) | 6 GB           | 1000            | Default                    | `redis_benchmark.py`    |
+| **Redis (without `redis-py`)** | 17.82 seconds        | 56,118 ops/sec     | `allkeys-lru`     | Disabled (AOF: no) | 6 GB           | 1000            | Raw Socket (RESP Encoding) | `redis_raw_socket.py`   |
+| **Tiny DB**                    | 14.85 seconds        | 67,340 ops/sec     | Num Shards 16     | N/A                | N/A            | N/A             | Raw Socket                 | `tinydb_benchmark.py`   |
 
 ## Percentage Differences
 
 - **Redis without `redis-py` vs Redis with `redis-py`**:
+
   - **Time**: 31.61% faster
   - **Ops/sec**: 46.27% more ops/sec
 
 - **Tiny DB vs Redis with `redis-py`**:
+
   - **Time**: 43.03% faster
   - **Ops/sec**: 75.48% more ops/sec
 
