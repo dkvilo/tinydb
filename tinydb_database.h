@@ -3,9 +3,9 @@
 
 #include "config.h"
 #include "tinydb_acl.h"
-#include "tinydb_user.h"
 #include "tinydb_datatype.h"
 #include "tinydb_hashmap.h"
+#include "tinydb_user.h"
 
 typedef struct
 {

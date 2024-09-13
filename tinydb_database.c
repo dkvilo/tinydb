@@ -1,6 +1,7 @@
-#include "tinydb_log.h"
-#include "tinydb_hash.h"
 #include "tinydb_database.h"
+#include "tinydb_database_entry_destructor.h"
+#include "tinydb_hash.h"
+#include "tinydb_log.h"
 
 int32_t
 Pick_Shard(const char* key)
@@ -13,7 +14,7 @@ void
 Initialize_Database(Database* db)
 {
   for (int i = 0; i < NUM_SHARDS; i++) {
-    db->shards[i].entries = HM_Create();
+    db->shards[i].entries = HM_Create(Database_Entry_Destructor);
     if (db->shards[i].entries == NULL) {
       DB_Log(DB_LOG_ERROR, "Failed to create hash map for shard %d", i);
       for (int j = 0; j < i; j++) {
@@ -35,5 +36,3 @@ Initialize_Database(Database* db)
     }
   }
 }
-
-

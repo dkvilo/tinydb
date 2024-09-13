@@ -1,10 +1,11 @@
 #include "tinydb_object.h"
+#include "tinydb_database_entry_destructor.h"
 
 DB_Object*
 CreateDBObject()
 {
   DB_Object* obj = (DB_Object*)malloc(sizeof(DB_Object));
-  obj->fields = HM_Create();
+  obj->fields = HM_Create(Database_Entry_Destructor);
   return obj;
 }
 

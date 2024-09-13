@@ -18,6 +18,7 @@ Memory_Pool_Destroy(MemoryPool* pool)
     free(current);
     current = next;
   }
+  pool->head = NULL;
   pthread_mutex_unlock(&pool->lock);
   pthread_mutex_destroy(&pool->lock);
 }
@@ -30,68 +31,116 @@ Memory_Pool_Alloc(MemoryPool* pool, size_t size)
   // align size to 8 bytes
   size = (size + 7) & ~7;
 
-  // if size is larger than MEMORY_POOL_SIZE, allocate a dedicated block
+  // check free lists in existing blocks
+  MemoryBlock* block = pool->head;
+  while (block) {
+    FreeChunk* prev = NULL;
+    FreeChunk* chunk = block->free_list;
+
+    while (chunk) {
+      if (size <= MEMORY_POOL_SIZE) {
+        // remove chunk from free list and return it
+        if (prev) {
+          prev->next = chunk->next;
+        } else {
+          block->free_list = chunk->next;
+        }
+        pthread_mutex_unlock(&pool->lock);
+        return (void*)chunk;
+      }
+      prev = chunk;
+      chunk = chunk->next;
+    }
+    block = block->next;
+  }
+
+  // if size is larger than MEMORY_POOL_SIZE, allocate dedicated memory
   if (size > MEMORY_POOL_SIZE) {
-    MemoryBlock* new_block = malloc(sizeof(MemoryBlock));
-    if (!new_block) {
-      pthread_mutex_unlock(&pool->lock);
-      return NULL;
-    }
-    new_block->memory = malloc(size);
-    if (!new_block->memory) {
-      free(new_block);
-      pthread_mutex_unlock(&pool->lock);
-      return NULL;
-    }
-    new_block->size = size;
-    new_block->used = size;
-    new_block->next = pool->head;
-    pool->head = new_block;
+    void* memory = malloc(size);
     pthread_mutex_unlock(&pool->lock);
-    return new_block->memory;
+    return memory;
   }
 
   // find a block with enough space or create a new one
-  MemoryBlock* current = pool->head;
-  MemoryBlock* prev = NULL;
-  while (current && current->used + size > current->size) {
-    prev = current;
-    current = current->next;
+  block = pool->head;
+  MemoryBlock* prev_block = NULL;
+  while (block && block->used + size > block->size) {
+    prev_block = block;
+    block = block->next;
   }
 
-  if (!current) {
-    current = malloc(sizeof(MemoryBlock));
-    if (!current) {
+  if (!block) {
+    block = (MemoryBlock*)malloc(sizeof(MemoryBlock));
+    if (!block) {
       pthread_mutex_unlock(&pool->lock);
       return NULL;
     }
-    current->memory = malloc(MEMORY_POOL_SIZE);
-    if (!current->memory) {
-      free(current);
+    block->memory = (char*)malloc(MEMORY_POOL_SIZE);
+    if (!block->memory) {
+      free(block);
       pthread_mutex_unlock(&pool->lock);
       return NULL;
     }
-    current->size = MEMORY_POOL_SIZE;
-    current->used = 0;
-    current->next = NULL;
-    if (prev) {
-      prev->next = current;
+    block->size = MEMORY_POOL_SIZE;
+    block->used = 0;
+    block->next = NULL;
+    block->free_list = NULL;
+
+    if (prev_block) {
+      prev_block->next = block;
     } else {
-      pool->head = current;
+      pool->head = block;
     }
   }
 
-  void* result = current->memory + current->used;
-  current->used += size;
+  void* result = block->memory + block->used;
+  block->used += size;
 
   pthread_mutex_unlock(&pool->lock);
   return result;
 }
 
 void
-Memory_Pool_Free(MemoryPool* pool, void* ptr)
+Memory_Pool_Free(MemoryPool* pool, void* ptr, size_t size)
 {
-  // we need to track of allocations and free them when possible
-  (void)pool;
-  (void)ptr;
+  if (!ptr || !pool)
+    return;
+
+  pthread_mutex_lock(&pool->lock);
+
+  // try to find the block that contains the pointer
+  MemoryBlock* block = pool->head;
+  while (block) {
+    if (ptr >= (void*)block->memory &&
+        ptr < (void*)(block->memory + block->size)) {
+      FreeChunk* chunk = (FreeChunk*)ptr;
+      chunk->next = block->free_list;
+      block->free_list = chunk;
+
+      block->used -= size;
+
+      // if block is free, reclaim it
+      if (block->used == 0) {
+        if (block == pool->head) {
+          pool->head = block->next;
+        } else {
+          MemoryBlock* prev = pool->head;
+          while (prev->next != block) {
+            prev = prev->next;
+          }
+          prev->next = block->next;
+        }
+
+        free(block->memory);
+        free(block);
+      }
+
+      pthread_mutex_unlock(&pool->lock);
+      return;
+    }
+    block = block->next;
+  }
+
+  free(ptr);
+  pthread_mutex_unlock(&pool->lock);
 }

@@ -10,12 +10,8 @@
 
 #include "tinydb_memory_pool.h"
 
-#define INITIAL_CAPACITY 16 // must be power of 2.
+#define INITIAL_CAPACITY 16 // must be a power of 2.
 #define LOAD_FACTOR_THRESHOLD 0.75
-
-// note (David) for very large hashmaps, bigger increment could be more
-// efficient. we can make it adaptive based on the current size of the hash map
-// tho
 #define RESIZE_WORK_INCREMENT 64
 
 #define HM_ACTION_FAILED -1
@@ -26,10 +22,13 @@ typedef struct HashEntry
 {
   char* key;
   void* value;
+  size_t key_size;
   bool is_occupied;
   bool is_deleted;
   atomic_flag is_migrating;
 } HashEntry;
+
+typedef void (*ValueDestructor)(void*);
 
 typedef struct HashMap
 {
@@ -43,10 +42,11 @@ typedef struct HashMap
   HashEntry* old_entries;
   size_t old_capacity;
   MemoryPool key_pool;
+  ValueDestructor value_destructor;
 } HashMap;
 
 HashMap*
-HM_Create();
+HM_Create(ValueDestructor value_destructor);
 
 void
 HM_Destroy(HashMap* map);

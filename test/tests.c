@@ -1,12 +1,13 @@
 #include <assert.h>
 #include <stdio.h>
 
+#include "../tinydb_database_entry_destructor.h"
 #include "../tinydb_hashmap.h"
 
 void
 Test_Create_Destroy()
 {
-  HashMap* map = HM_Create();
+  HashMap* map = HM_Create(Database_Entry_Destructor);
   assert(map != NULL);
   assert(map->capacity == INITIAL_CAPACITY);
   assert(atomic_load(&map->size) == 0);
@@ -18,7 +19,7 @@ Test_Create_Destroy()
 void
 Test_Insert()
 {
-  HashMap* map = HM_Create();
+  HashMap* map = HM_Create(Database_Entry_Destructor);
   char* key = "test_key";
   char* value = "test_value";
 
@@ -37,7 +38,7 @@ Test_Insert()
 void
 Test_Modify()
 {
-  HashMap* map = HM_Create();
+  HashMap* map = HM_Create(Database_Entry_Destructor);
   char* key = "test_key";
   char* value = "test_value";
   char* new_value = "new_value";
@@ -57,7 +58,7 @@ Test_Modify()
 void
 Test_Remove()
 {
-  HashMap* map = HM_Create();
+  HashMap* map = HM_Create(Database_Entry_Destructor);
   char* key = "test_key";
   char* value = "test_value";
 
@@ -76,7 +77,7 @@ Test_Remove()
 void
 Test_Resize()
 {
-  HashMap* map = HM_Create();
+  HashMap* map = HM_Create(Database_Entry_Destructor);
 
   char key[10];
   char value[20];

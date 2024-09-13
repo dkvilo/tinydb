@@ -23,6 +23,15 @@ TCP_Client_Handler(void* socket_desc)
   char buffer[COMMAND_BUFFER_SIZE];
   ssize_t read_size;
 
+#if 0
+  struct timeval timeout;
+  timeout.tv_sec = 5; /* we need to make this configurable. */
+  timeout.tv_usec = 0;
+
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+  setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+#endif
+
   while (1) {
 
     memset(buffer, 0, COMMAND_BUFFER_SIZE);

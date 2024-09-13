@@ -1,10 +1,10 @@
 /**
+ * note (David)
  * /COLLISION HANDLING/
- *    when collision happens we are using quadratic probing to find a free index
- *    because of the nature of quadratic probing algorithm to keep it reasonably
- * performant we need to make sure that size of the buffer is always power of 2
- * when we are creating/resizing the buffer.
- *    - David K.
+ * when collision happens we are using quadratic probing to find a free index
+ * because of the nature of quadratic probing algorithm to keep it reasonably
+ * performant we need to make sure that size of the buffer is always power of
+ * 2 when we are creating/resizing the buffer.
  */
 #include "tinydb_hashmap.h"
 #include "tinydb_log.h"
@@ -28,14 +28,14 @@ Quad_Probe(size_t index, size_t i, size_t cap)
 }
 
 HashMap*
-HM_Create()
+HM_Create(ValueDestructor value_destructor)
 {
   HashMap* map = (HashMap*)malloc(sizeof(HashMap));
   if (!map)
     return NULL;
 
   map->capacity = INITIAL_CAPACITY;
-  map->size = 0;
+  atomic_init(&map->size, 0);
   map->entries = (HashEntry*)calloc(map->capacity, sizeof(HashEntry));
   map->locks =
     (pthread_rwlock_t*)malloc(map->capacity * sizeof(pthread_rwlock_t));
@@ -59,6 +59,7 @@ HM_Create()
   map->old_capacity = 0;
   Memory_Pool_Init(&map->key_pool);
 
+  map->value_destructor = value_destructor;
   return map;
 }
 
@@ -70,12 +71,32 @@ HM_Destroy(HashMap* map)
 
   for (size_t i = 0; i < map->capacity; i++) {
     pthread_rwlock_destroy(&map->locks[i]);
+    if (map->entries[i].is_occupied && !map->entries[i].is_deleted) {
+      Memory_Pool_Free(
+        &map->key_pool, map->entries[i].key, map->entries[i].key_size);
+      if (map->value_destructor && map->entries[i].value != NULL) {
+        map->value_destructor(map->entries[i].value);
+      }
+    }
+  }
+
+  if (map->old_entries != NULL) {
+    for (size_t i = 0; i < map->old_capacity; i++) {
+      if (map->old_entries[i].is_occupied && !map->old_entries[i].is_deleted) {
+        Memory_Pool_Free(&map->key_pool,
+                         map->old_entries[i].key,
+                         map->old_entries[i].key_size);
+        if (map->value_destructor && map->old_entries[i].value != NULL) {
+          map->value_destructor(map->old_entries[i].value);
+        }
+      }
+    }
+    free(map->old_entries);
   }
 
   pthread_mutex_destroy(&map->resize_lock);
   free(map->entries);
   free(map->locks);
-  free(map->old_entries);
   Memory_Pool_Destroy(&map->key_pool);
   free(map);
 }
@@ -104,11 +125,27 @@ resize_increment(HashMap* map)
       size_t j = 1;
       while (map->entries[index].is_occupied) {
         index = Quad_Probe(index, j, map->capacity);
-
         j++;
       }
       map->entries[index] = map->old_entries[i];
       atomic_flag_clear(&map->entries[index].is_migrating);
+
+    } else if (map->old_entries[i].is_occupied) {
+      while (atomic_flag_test_and_set(&map->old_entries[i].is_migrating)) {
+      }
+
+      Memory_Pool_Free(
+        &map->key_pool, map->old_entries[i].key, map->old_entries[i].key_size);
+      if (map->value_destructor && map->old_entries[i].value != NULL) {
+        map->value_destructor(map->old_entries[i].value);
+      }
+
+      map->old_entries[i].key = NULL;
+      map->old_entries[i].value = NULL;
+      map->old_entries[i].is_occupied = false;
+      map->old_entries[i].is_deleted = false;
+
+      atomic_flag_clear(&map->old_entries[i].is_migrating);
     }
   }
 
@@ -132,12 +169,11 @@ resize_if_needed(HashMap* map)
     return;
 
   if (atomic_exchange(&map->is_resizing, true))
-    return; // other thread is already resizing
+    return; // another thread is already resizing
 
   pthread_mutex_lock(&map->resize_lock);
 
-  size_t new_capacity = map->capacity
-                        << 1; // double the capacity (always power of 2)
+  size_t new_capacity = map->capacity << 1; // double the capacity
   HashEntry* new_entries = (HashEntry*)calloc(new_capacity, sizeof(HashEntry));
   pthread_rwlock_t* new_locks =
     (pthread_rwlock_t*)malloc(new_capacity * sizeof(pthread_rwlock_t));
@@ -147,7 +183,7 @@ resize_if_needed(HashMap* map)
     free(new_locks);
     atomic_store(&map->is_resizing, false);
     pthread_mutex_unlock(&map->resize_lock);
-    return; // failed to allocate memory, keep old size
+    return;
   }
 
   for (size_t i = 0; i < new_capacity; i++) {
@@ -168,9 +204,6 @@ resize_if_needed(HashMap* map)
   resize_increment(map);
 }
 
-/**
- * @returns -1 Failed, 0 Added, 1 Modified
- */
 int8_t
 HM_Put(HashMap* map, const char* key, void* value)
 {
@@ -189,7 +222,12 @@ HM_Put(HashMap* map, const char* key, void* value)
 
     if (!map->entries[index].is_occupied || map->entries[index].is_deleted) {
       if (map->entries[index].is_deleted) {
-        // do not free the key, it's managed by the memory pool
+        Memory_Pool_Free(&map->key_pool,
+                         map->entries[index].key,
+                         map->entries[index].key_size);
+        if (map->value_destructor && map->entries[index].value != NULL) {
+          map->value_destructor(map->entries[index].value);
+        }
       } else {
         atomic_fetch_add(&map->size, 1);
       }
@@ -199,6 +237,7 @@ HM_Put(HashMap* map, const char* key, void* value)
       memcpy(new_key, key, key_len);
 
       map->entries[index].key = new_key;
+      map->entries[index].key_size = key_len;
       map->entries[index].value = value;
       map->entries[index].is_occupied = true;
       map->entries[index].is_deleted = false;
@@ -208,6 +247,9 @@ HM_Put(HashMap* map, const char* key, void* value)
     }
 
     if (strcmp(map->entries[index].key, key) == 0) {
+      if (map->value_destructor && map->entries[index].value != NULL) {
+        map->value_destructor(map->entries[index].value);
+      }
       map->entries[index].value = value;
       map->entries[index].is_deleted = false;
       pthread_rwlock_unlock(&map->locks[index]);
@@ -226,8 +268,8 @@ HM_Put(HashMap* map, const char* key, void* value)
 void*
 HM_Get(HashMap* map, const char* key)
 {
-  if (map == NULL) {
-    DB_Log(DB_LOG_ERROR, "Hashmap is NULL");
+  if (map == NULL || key == NULL) {
+    DB_Log(DB_LOG_ERROR, "HashMap or key is NULL");
     return NULL;
   }
 
@@ -248,7 +290,7 @@ HM_Get(HashMap* map, const char* key)
       return NULL;
     }
 
-    if (map->entries[index].is_occupied && !map->entries[index].is_deleted &&
+    if (!map->entries[index].is_deleted &&
         strcmp(map->entries[index].key, key) == 0) {
       void* value = map->entries[index].value;
       pthread_rwlock_unlock(&map->locks[index]);
@@ -258,7 +300,7 @@ HM_Get(HashMap* map, const char* key)
     pthread_rwlock_unlock(&map->locks[index]);
     i++;
 
-    index = (index + i * i) % map->capacity;
+    index = Quad_Probe(index, i, map->capacity);
   } while (index != start_index);
 
   return NULL;
@@ -267,6 +309,10 @@ HM_Get(HashMap* map, const char* key)
 int
 HM_Remove(HashMap* map, const char* key)
 {
+  if (map == NULL || key == NULL) {
+    return 0;
+  }
+
   resize_increment(map);
 
   size_t index = hash(key, map->capacity);
@@ -281,14 +327,25 @@ HM_Remove(HashMap* map, const char* key)
       return 0;
     }
 
-    if (map->entries[index].is_occupied && !map->entries[index].is_deleted &&
+    if (!map->entries[index].is_deleted &&
         strcmp(map->entries[index].key, key) == 0) {
-      // we are wait if the entry is being migrated
+      // waiting if the entry is being migrated
       while (atomic_flag_test_and_set(&map->entries[index].is_migrating)) {
         pthread_rwlock_unlock(&map->locks[index]);
         pthread_rwlock_wrlock(&map->locks[index]);
       }
+
+      Memory_Pool_Free(
+        &map->key_pool, map->entries[index].key, map->entries[index].key_size);
+      if (map->value_destructor && map->entries[index].value != NULL) {
+        map->value_destructor(map->entries[index].value);
+      }
+
+      map->entries[index].key = NULL;
+      map->entries[index].value = NULL;
       map->entries[index].is_deleted = true;
+      map->entries[index].is_occupied = false;
+
       atomic_fetch_sub(&map->size, 1);
       atomic_flag_clear(&map->entries[index].is_migrating);
       pthread_rwlock_unlock(&map->locks[index]);
