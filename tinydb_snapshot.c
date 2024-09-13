@@ -7,6 +7,7 @@
 
 #include "tinydb_log.h"
 #include "tinydb_snapshot.h"
+#include "tinydb_database_entry_destructor.h"
 
 void
 write_string(FILE* file, const char* str)
@@ -263,7 +264,7 @@ Import_Snapshot(RuntimeContext* ctx, const char* filename)
       shard->num_entries = *(uint64_t*)ptr;
       ptr += sizeof(uint64_t);
 
-      shard->entries = HM_Create();
+      shard->entries = HM_Create(Database_Entry_Destructor);
       if (!shard->entries) {
         DB_Log(DB_LOG_ERROR, "Failed to create hash map for shard %d", j);
         munmap(data, st.st_size);
