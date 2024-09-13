@@ -78,7 +78,7 @@ main(int argc, char const* argv[])
   Thread_Pool_Init();
   DB_Log(DB_LOG_INFO, "Thread Pool has been created.");
 
-  context = Initialize_Context(NUM_INITAL_DATABASES+2, DEFAULT_SNAPSHOT_NAME);
+  context = Initialize_Context(NUM_INITAL_DATABASES, DEFAULT_SNAPSHOT_NAME);
   DB_Log(DB_LOG_INFO, "RuntimeContext has been allocated and initialized.");
 
 #if 1

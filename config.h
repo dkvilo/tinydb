@@ -1,5 +1,5 @@
 #ifndef __TINY_DB_CONFIG
-#define __TINY_DB_CONFIG 
+#define __TINY_DB_CONFIG
 
 // port that TCP connection will be open
 #define PORT 8079
