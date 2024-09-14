@@ -1,6 +1,9 @@
-use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use actix_web::web::Bytes;
+use actix_web::{web, App, Error, HttpResponse, HttpServer, Responder};
+use async_stream::stream;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
+use tokio::sync::broadcast;
 
 mod template;
 mod tinydb_client;
@@ -13,6 +16,7 @@ struct TweetRequest {
 
 struct AppState {
     db_client: Mutex<tinydb_client::TinyDBClient>,
+    tx: broadcast::Sender<()>,
 }
 
 async fn post_tweet(state: web::Data<AppState>, form: web::Form<TweetRequest>) -> impl Responder {
@@ -23,27 +27,40 @@ async fn post_tweet(state: web::Data<AppState>, form: web::Form<TweetRequest>) -
         Err(poisoned) => poisoned.into_inner(),
     };
 
-    let response = match form.command.clone().as_str() {
+    let response = match form.command.as_str() {
         "rpush" => match &form.text {
             Some(tweet) => match db_client.rpush("tweets", tweet) {
-                Ok(_) => HttpResponse::Ok().body("Tweet posted successfully with RPUSH!"),
+                Ok(_) => {
+                    let _ = state.tx.send(());
+                    HttpResponse::Ok().body("Tweet posted successfully with RPUSH!")
+                }
                 Err(err) => HttpResponse::InternalServerError().body(format!("Error: {}", err)),
             },
             None => HttpResponse::BadRequest().body("Text is required for RPUSH!"),
         },
         "lpush" => match &form.text {
             Some(tweet) => match db_client.lpush("tweets", tweet) {
-                Ok(_) => HttpResponse::Ok().body("Tweet posted successfully with LPUSH!"),
+                Ok(_) => {
+                    let _ = state.tx.send(());
+                    HttpResponse::Ok().body("Tweet posted successfully with LPUSH!")
+                }
                 Err(err) => HttpResponse::InternalServerError().body(format!("Error: {}", err)),
             },
             None => HttpResponse::BadRequest().body("Text is required for LPUSH!"),
         },
         "rpop" => match db_client.rpop("tweets") {
-            Ok(tweet) => HttpResponse::Ok().body(format!("Tweet popped: {}", tweet)),
+            Ok(tweet) => {
+                let _ = state.tx.send(());
+                HttpResponse::Ok().body(format!("Tweet popped: {}", tweet))
+            }
             Err(err) => HttpResponse::InternalServerError().body(format!("Error: {}", err)),
         },
         "lpop" => match db_client.lpop("tweets") {
-            Ok(tweet) => HttpResponse::Ok().body(format!("Tweet popped: {}", tweet)),
+            Ok(tweet) => {
+                let _ = state.tx.send(());
+                HttpResponse::Ok().body(format!("Tweet popped: {}", tweet))
+            }
+
             Err(err) => HttpResponse::InternalServerError().body(format!("Error: {}", err)),
         },
         _ => HttpResponse::BadRequest().body("Invalid command!"),
@@ -78,18 +95,47 @@ async fn fetch_tweets(state: web::Data<AppState>) -> impl Responder {
     }))
 }
 
-
 async fn tweet_page() -> impl Responder {
     HttpResponse::Ok()
         .content_type("text/html")
         .body(template::INDEX_HTML)
 }
 
+async fn tweet_events(state: web::Data<AppState>) -> impl Responder {
+    let rx = state.tx.subscribe();
+
+    let stream = stream! {
+        let mut rx = rx;
+        loop {
+            match rx.recv().await {
+                Ok(_) => {
+                    let data = format!("data: {}\n\n", "new_tweet");
+                    yield Ok::<Bytes, Error>(Bytes::from(data));
+                },
+                Err(broadcast::error::RecvError::Closed) => {
+                    break;
+                },
+                Err(_) => {},
+            }
+        }
+    };
+
+    HttpResponse::Ok()
+        .append_header(("Content-Type", "text/event-stream"))
+        .append_header(("Cache-Control", "no-cache"))
+        .append_header(("Connection", "keep-alive"))
+        .keep_alive()
+        .streaming(stream)
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let client = tinydb_client::TinyDBClient::new("127.0.0.1:8079").unwrap();
+    let (tx, _) = broadcast::channel(100);
+
     let app_state = web::Data::new(AppState {
         db_client: Mutex::new(client),
+        tx,
     });
 
     HttpServer::new(move || {
@@ -98,6 +144,7 @@ async fn main() -> std::io::Result<()> {
             .route("/", web::get().to(tweet_page))
             .route("/tweets", web::post().to(post_tweet))
             .route("/tweets_list", web::post().to(fetch_tweets))
+            .route("/events", web::get().to(tweet_events))
     })
     .bind("0.0.0.0:8080")?
     .run()

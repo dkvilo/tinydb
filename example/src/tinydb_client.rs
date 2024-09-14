@@ -22,6 +22,8 @@
 
     - David
 */
+#![allow(dead_code)]
+
 use std::io::{BufReader, BufRead, Write};
 use std::net::TcpStream;
 use std::str;
@@ -106,5 +108,18 @@ impl TinyDBClient {
     pub fn lrange(&mut self, key: &str, start: i32, stop: i32) -> Result<String, std::io::Error> {
         let response = self.send_command(&format!("LRANGE {} {} {}", key, start, stop))?;
         Ok(format!("{}", response))
+    }
+
+    pub fn subscribe(&mut self, channel: &str) -> Result<String, std::io::Error> {
+        self.send_command(&format!("SUB {}", channel))
+    }
+
+    pub fn unsubscribe(&mut self, channel: &str) -> Result<String, std::io::Error> {
+        self.send_command(&format!("UNSUB {}", channel))
+    }
+
+    pub fn publish(&mut self, channel: &str, message: &str) -> Result<String, std::io::Error> {
+        let escaped_message = Self::escape_value(message);
+        self.send_command(&format!("PUB {} {}", channel, escaped_message))
     }
 }
