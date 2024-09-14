@@ -4,12 +4,12 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "tinydb_database.h"
+#include "tinydb_atomic_proc.h"
 #include "tinydb_command_executor.h"
+#include "tinydb_database.h"
+#include "tinydb_list.h"
 #include "tinydb_log.h"
 #include "tinydb_snapshot.h"
-#include "tinydb_atomic_proc.h"
-#include "tinydb_list.h"
 
 #define RESPONSE_OK "Ok\n"
 #define RESPONSE_FAILED "FAILED\n"
@@ -389,7 +389,13 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
       TCP_Write(sock, MSG("KEY_NOT_FOUND"), 0);
     }
   }
-
+  else if (strcmp(cmd->command, "SUB") == 0) {
+    Subscribe(context->pubsub_system, cmd->argv[0], sock);
+  } else if (strcmp(cmd->command, "UNSUB") == 0) {
+    Unsubscribe(context->pubsub_system, cmd->argv[0], sock);
+  } else if (strcmp(cmd->command, "PUB") == 0) {
+    Publish(context->pubsub_system, cmd->argv[0], cmd->argv[1]);
+  }
   else if (strcmp(cmd->command, "LRANGE") == 0) {
     if (cmd->argc < 3) {
       TCP_Write(sock, MSG("USAGE_LRANGE"), 0);
@@ -400,8 +406,7 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
     int stop = atoi(cmd->argv[2]);
 
     DatabaseEntry res = DB_Atomic_Get(db, key);
-    if (res.type == DB_ENTRY_LIST)
-    {
+    if (res.type == DB_ENTRY_LIST) {
       HPLinkedList* list = res.value.list;
       char* buffer = HPList_ToString(list);
       TCP_Write(sock, buffer, 1);
