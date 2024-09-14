@@ -86,6 +86,12 @@ pub const INDEX_HTML: &str = r#"
 <ul id="tweetList"></ul>
 
 <script>
+  const eventSource = new EventSource("/events");
+  eventSource.onmessage = function(event) {
+    if (event.data === "new_tweet") {
+      updateTweetList();
+    }
+  };
 
   document.getElementById("tweetForm").addEventListener("submit", async function (event) {
     event.preventDefault();
@@ -107,7 +113,6 @@ pub const INDEX_HTML: &str = r#"
 
     if (response.ok) {
       document.getElementById("tweetText").value = "";
-      updateTweetList();
     } else {
       alert("Failed to process the command.");
     }
