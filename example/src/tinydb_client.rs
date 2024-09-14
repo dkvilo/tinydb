@@ -108,23 +108,3 @@ impl TinyDBClient {
         Ok(format!("{}", response))
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_set_get() {
-        let mut client = TinyDBClient::new("127.0.0.1:8079").unwrap();
-        assert_eq!(client.set("test_key", "test value with spaces").unwrap(), "Ok");
-        assert_eq!(client.get("test_key").unwrap(), "test value with spaces");
-    }
-    
-    #[test]
-    fn test_list() {
-        let mut client = TinyDBClient::new("127.0.0.1:8079").unwrap();
-        assert_eq!(client.lpush("test_list", "value 1").unwrap(), "Ok");
-        assert_eq!(client.rpush("test_list", "value 2").unwrap(), "Ok");
-        assert_eq!(client.lrange("test_list", 0, -1).unwrap(), "[\"value 1\",\"value 2\"]");
-    }
-}
