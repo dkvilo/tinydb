@@ -13,7 +13,6 @@
 #include "tinydb_query_parser.h"
 #include "tinydb_tcp_client_handler.h"
 
-extern Database* db;
 extern RuntimeContext* context;
 
 void
@@ -41,11 +40,11 @@ TCP_Client_Handler(void* socket_desc)
       break;
 
     buffer[read_size] = '\0';
-    buffer[strcspn(buffer, "\r\n")] = 0;
+    buffer[strcspn(buffer, "\r\n")] = '\0';
 
     ParsedCommand* cmd = Parse_Command(buffer);
     if (cmd != NULL) {
-      Execute_Command(sock, cmd, db);
+      Execute_Command(sock, cmd, context->Active.db);
       Free_Parsed_Command(cmd);
     } else {
       const char* error_msg = "Invalid command\n";

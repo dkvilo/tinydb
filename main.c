@@ -15,7 +15,6 @@
 #include "tinydb_tcp_server.h"
 #include "tinydb_thread_pool.h"
 
-Database* db = NULL;
 RuntimeContext* context = NULL;
 
 void
@@ -93,17 +92,18 @@ main(int argc, char const* argv[])
   context->user_manager.num_users++;
 #endif
 
-  db = context->db_manager.databases;
-  if (!db->name) {
-    db->name = "default";
+  context->Active.user = &context->user_manager.users[0];
+  context->Active.db = context->db_manager.databases;
+  if (!context->Active.db->name) {
+    context->Active.db->name = "default";
   }
-  DB_Log(DB_LOG_INFO, "Default Database (%s) has been assigned.", db->name);
+  DB_Log(DB_LOG_INFO, "Default Database (%s) has been assigned.", context->Active.db->name);
 
   TCP_Server tcp_server = { 0 };
   TCP_Client tcp_client = { 0 };
 
   TCP_Server_Create(&tcp_server);
-  DB_Log(DB_LOG_INFO, "TCP Server has been initialized.", db->name);
+  DB_Log(DB_LOG_INFO, "TCP Server has been initialized.", context->Active.db->name);
   DB_Log(DB_LOG_INFO, " - Host: %s", "127.0.0.1");
   DB_Log(DB_LOG_INFO, " - Port: %d", PORT);
 

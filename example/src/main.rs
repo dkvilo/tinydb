@@ -2,8 +2,8 @@ use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
-mod tinydb_client;
 mod template;
+mod tinydb_client;
 
 #[derive(Deserialize, Serialize)]
 struct TweetRequest {
@@ -16,10 +16,14 @@ struct AppState {
 }
 
 async fn post_tweet(state: web::Data<AppState>, form: web::Form<TweetRequest>) -> impl Responder {
-    let mut db_client = state.db_client.lock().unwrap();
+    let db_client_result = state.db_client.lock();
 
-    let command = form.command.clone();
-    let response = match command.as_str() {
+    let mut db_client = match db_client_result {
+        Ok(client) => client,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+
+    let response = match form.command.clone().as_str() {
         "rpush" => match &form.text {
             Some(tweet) => match db_client.rpush("tweets", tweet) {
                 Ok(_) => HttpResponse::Ok().body("Tweet posted successfully with RPUSH!"),
@@ -48,9 +52,13 @@ async fn post_tweet(state: web::Data<AppState>, form: web::Form<TweetRequest>) -
     response
 }
 
-async fn fetch_tweets(state: web::Data<AppState> ) -> impl Responder {
-    let mut db_client = state.db_client.lock().unwrap();
-    
+async fn fetch_tweets(state: web::Data<AppState>) -> impl Responder {
+    let db_client_result = state.db_client.lock();
+    let mut db_client = match db_client_result {
+        Ok(client) => client,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+
     let tweet_count = match db_client.llen("tweets") {
         Ok(count) => count.parse::<i32>().unwrap_or(0),
         Err(_) => 0,
@@ -61,9 +69,8 @@ async fn fetch_tweets(state: web::Data<AppState> ) -> impl Responder {
         Err(_) => "[]".to_string(),
     };
 
-    let tweets_json = serde_json::from_str::<serde_json::Value>(&tweets_response).unwrap_or_else(|_| {
-        serde_json::json!(["Unexpected format"])
-    });
+    let tweets_json = serde_json::from_str::<serde_json::Value>(&tweets_response)
+        .unwrap_or_else(|_| serde_json::json!(["Unexpected format"]));
 
     HttpResponse::Ok().json(serde_json::json!({
         "tweets": tweets_json,
@@ -73,12 +80,14 @@ async fn fetch_tweets(state: web::Data<AppState> ) -> impl Responder {
 
 
 async fn tweet_page() -> impl Responder {
-    HttpResponse::Ok().content_type("text/html").body(template::INDEX_HTML)
+    HttpResponse::Ok()
+        .content_type("text/html")
+        .body(template::INDEX_HTML)
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let client =  tinydb_client::TinyDBClient::new("127.0.0.1:8079").unwrap();
+    let client = tinydb_client::TinyDBClient::new("127.0.0.1:8079").unwrap();
     let app_state = web::Data::new(AppState {
         db_client: Mutex::new(client),
     });
@@ -90,7 +99,7 @@ async fn main() -> std::io::Result<()> {
             .route("/tweets", web::post().to(post_tweet))
             .route("/tweets_list", web::post().to(fetch_tweets))
     })
-    .bind("127.0.0.1:8080")?
+    .bind("0.0.0.0:8080")?
     .run()
     .await
 }

@@ -8,12 +8,14 @@
 #include <string.h>
 
 #include "config.h"
-#include "tinydb_datatype.h"
-#include "tinydb_user.h"
 #include "tinydb_database.h"
+#include "tinydb_datatype.h"
+#include "tinydb_pubsub.h"
+#include "tinydb_user.h"
 
 typedef struct RuntimeContext
 {
+  PubSubSystem* pubsub_system;
   DatabaseManager db_manager;
   UserManager user_manager;
   struct

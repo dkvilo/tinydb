@@ -1,5 +1,5 @@
-
 pub const INDEX_HTML: &str = r#"
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -59,13 +59,12 @@ pub const INDEX_HTML: &str = r#"
     margin-bottom: 5px;
     border-radius: 4px;
   }
-
 </style>
 </head>
+
 <body>
 <form id="tweetForm">
   <textarea
-    maxlength="1000"
     type="text"
     id="tweetText"
     name="text"
@@ -185,5 +184,5 @@ pub const INDEX_HTML: &str = r#"
   updateTweetList();
 </script>
 </body>
-</html> 
+</html>
 "#;

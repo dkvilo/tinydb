@@ -8,7 +8,7 @@
 #define HOST (u_int32_t)0x00000000
 
 // total command message length in bytes
-#define COMMAND_BUFFER_SIZE 4096
+#define COMMAND_BUFFER_SIZE 1000000
 
 // total connections that server can queue
 #define CONN_QUEUE_SIZE 128
@@ -25,7 +25,7 @@
 // this must be a power of 2 (e.g., 2, 4, 8, 16, 32 ...)
 #define NUM_SHARDS 16
 
-// max size of string buffer size in the list (1 MiB)
-#define MAX_STRING_LENGTH 1000000
+// max size of string buffer size in the list
+#define MAX_STRING_LENGTH COMMAND_BUFFER_SIZE
 
 #endif // __TINY_DB_CONFIG
