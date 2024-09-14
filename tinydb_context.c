@@ -2,6 +2,7 @@
 #include "tinydb_hash.h"
 #include "tinydb_log.h"
 #include "tinydb_snapshot.h"
+#include "tinydb_pubsub.h"
 
 RuntimeContext*
 Initialize_Context(int32_t num_databases, const char* snapshot_file)
@@ -14,6 +15,8 @@ Initialize_Context(int32_t num_databases, const char* snapshot_file)
 
   context->Active.db = NULL;
   context->Active.user = NULL;
+
+  context->pubsub_system = Create_PubSub_System();
 
   if (snapshot_file != NULL) {
     if (Import_Snapshot(context, snapshot_file) == 0) {
