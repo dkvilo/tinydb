@@ -38,10 +38,15 @@ TCP_Server_Process_Connections(TCP_Server* sv,
       continue;
     }
 
-    DB_Log(DB_LOG_INFO, "TCP_SERVER Connection accepted");
+    DB_Log(DB_LOG_INFO, "TCP_SERVER Connection accepted: socket %d", c->sock);
 
     pthread_t sniffer_thread;
-    c->new_sock = malloc(sizeof(int));
+    c->new_sock = (int*)malloc(sizeof(int));
+    if (c->new_sock == NULL) {
+      DB_Log(DB_LOG_ERROR, "TCP_SERVER Failed to allocate memory for new_sock");
+      close(c->sock);
+      continue;
+    }
     *c->new_sock = c->sock;
 
     Thread_Pool_Add_Task(function, (void*)c->new_sock);
