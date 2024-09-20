@@ -11,6 +11,7 @@ TINY DB is a fast, in-memory key-value store designed with support for sharded d
 - Multi-User Support with Custom Access Levels (read, write, and delete permissions)
 - Built-in TCP server for handling client connections.
 - Asynchronous Task Processing (client requests are handled asynchronously using a task queue and a thread pool)
+- Pub/Sub messaging system
 
 ## Performance Comparison: Redis vs Tiny DB
 
@@ -78,7 +79,9 @@ Or use benchmark program and/or example project that implements client library (
 | `LLEN <key>`                  |
 | `EXPORT snapshot.bin`         |
 | `INSP`                        |
-
+| `SUB <channel>`               |
+| `UNSUB <channel>`             |
+| `PUB <channel> <message>`     |
 
 By default, the server will bind to all available interfaces ```INADDR_ANY``` and listen on the specified port ```PORT``` (config.h).
 
