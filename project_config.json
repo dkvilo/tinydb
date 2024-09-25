@@ -1,0 +1,8 @@
+{
+  "build_command" : "make -C `echo $(pwd)` -B",
+  "format_on_save": true,
+  "formatter": {
+    "bin": "clang-format",
+    "style": "Mozilla"
+  }
+}
