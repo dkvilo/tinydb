@@ -14,6 +14,7 @@
 #include "tinydb_tcp_client_handler.h"
 #include "tinydb_tcp_server.h"
 #include "tinydb_thread_pool.h"
+#include "tinydb_webhook.h"
 
 RuntimeContext* context = NULL;
 
@@ -81,7 +82,7 @@ main(int argc, char const* argv[])
   DB_Log(DB_LOG_INFO, "RuntimeContext has been allocated and initialized.");
 
 #if 1
-  context->user_manager.users = (DB_User*) malloc(sizeof(DB_User));
+  context->user_manager.users = (DB_User*)malloc(sizeof(DB_User));
   context->user_manager.users[0].ID = 0;
   context->user_manager.users[0].name = "default";
   context->user_manager.users[0].access = (DB_Access*)malloc(sizeof(DB_Access));
@@ -97,13 +98,21 @@ main(int argc, char const* argv[])
   if (!context->Active.db->name) {
     context->Active.db->name = "default";
   }
-  DB_Log(DB_LOG_INFO, "Default Database (%s) has been assigned.", context->Active.db->name);
+  DB_Log(DB_LOG_INFO,
+         "Default Database (%s) has been assigned.",
+         context->Active.db->name);
 
   TCP_Server tcp_server = { 0 };
   TCP_Client tcp_client = { 0 };
 
+  Add_Webhook("@hook_test", "https://webhook.site/2b054855-6a59-4e30-abaa-0c76d6522c84");
+  Add_Webhook("@hook_test", "http://localhost/webhook");
+
+  List_Webhooks("@hook_test");
+
   TCP_Server_Create(&tcp_server);
-  DB_Log(DB_LOG_INFO, "TCP Server has been initialized.", context->Active.db->name);
+  DB_Log(
+    DB_LOG_INFO, "TCP Server has been initialized.", context->Active.db->name);
   DB_Log(DB_LOG_INFO, " - Host: %s", "127.0.0.1");
   DB_Log(DB_LOG_INFO, " - Port: %d", PORT);
 
