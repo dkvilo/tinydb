@@ -40,13 +40,22 @@ Subscribe(PubSubSystem* system, const char* channel_name, int32_t socket_fd);
 void
 Unsubscribe(PubSubSystem* system, const char* channel_name, int32_t socket_fd);
 
+void
+Unsubscribe_All(PubSubSystem* system, int32_t socket_fd);
+
 Channel*
 Find_Channel(PubSubSystem* system, const char* channel_name);
+
+void
+Remove_Empty_Channel(PubSubSystem* system, const char* channel_name);
 
 void
 Publish(PubSubSystem* system, const char* channel_name, const char* message);
 
 void
 Send_Message(void* socket_desc);
+
+void
+Destroy_PubSub_System(PubSubSystem* system);
 
 #endif // __TINY_DB_PUBSUB
