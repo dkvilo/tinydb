@@ -119,7 +119,8 @@ Send_Webhook(void* args)
   free(webhook_args);
 }
 
-// todo (David) this do not support SSL (for now we are only parsing the schema https)
+// todo (David) this do not support SSL (for now we are only parsing the schema
+// https)
 void
 Send_Http_Post(const char* url, const char* json_data)
 {
@@ -205,7 +206,7 @@ Send_Http_Post(const char* url, const char* json_data)
   if (bytes_received > 0) {
     response[bytes_received] = '\0';
     DB_Log(DB_LOG_INFO,
-           "Webhook response from %s://%s:%d: %s",
+           "Webhook response from %s://%s:%d:\n%s",
            schema,
            host,
            port,
