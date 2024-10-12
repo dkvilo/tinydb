@@ -54,26 +54,24 @@ TCP_Client_Handler(void* socket_desc)
     read_size =
       recv(sock, buffer + total_read, buffer_size - total_read - 1, 0);
 
-    if (read_size <= 0)
+    if (read_size <= 0) {
       break;
+    }
 
     total_read += read_size;
     buffer[total_read] = '\0';
     buffer[strcspn(buffer, "\r\n")] = '\0';
 
-    ParsedCommand* cmd = Parse_Command(buffer);
+    ParsedCommand* cmd = Parse_Command(buffer, buffer_size, &total_read);
     if (cmd != NULL) {
       Execute_Command(sock, cmd, context->Active.db);
       Free_Parsed_Command(cmd);
-
-      // reset the buffer
-      total_read = 0;
-      memset(buffer, 0, buffer_size);
     } else {
       const char* error_msg = "Invalid command\n";
       if (write(sock, error_msg, strlen(error_msg)) == -1) {
         DB_Log(DB_LOG_ERROR,
-               "TCP_SERVER Failed to send error message, closing connection.");
+               "TCP_SERVER Failed to send error message, closing"
+               "connection.");
         break;
       }
     }

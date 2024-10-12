@@ -14,18 +14,18 @@
 #define RESPONSE_OK "Ok\n"
 #define RESPONSE_FAILED "FAILED\n"
 #define RESPONSE_KEY_NOT_FOUND "null\n"
-#define RESPONSE_USAGE_SET "Usage: SET <key> <value>\n"
-#define RESPONSE_USAGE_GET "Usage: GET <key>\n"
-#define RESPONSE_USAGE_INCR "Usage: INCR <key>\n"
-#define RESPONSE_USAGE_APPEND "Usage: APPEND <key> <value>\n"
-#define RESPONSE_USAGE_STRLEN "Usage: STRLEN <key>\n"
-#define RESPONSE_USAGE_EXPORT "Usage: EXPORT snapshot.bin\n"
-#define RESPONSE_USAGE_RPUSH "Usage: RPUSH <key> <value>\n"
-#define RESPONSE_USAGE_LPUSH "Usage: LPUSH <key> <value>\n"
-#define RESPONSE_USAGE_RPOP "Usage: RPOP <key>\n"
-#define RESPONSE_USAGE_LPOP "Usage: LPOP <key>\n"
-#define RESPONSE_USAGE_LLEN "Usage: LLEN <key>\n"
-#define RESPONSE_USAGE_LRANGE "Usage: LRANGE <key> <min> <max>\n"
+#define RESPONSE_USAGE_SET "Usage: set <key> <value>\n"
+#define RESPONSE_USAGE_GET "Usage: get <key>\n"
+#define RESPONSE_USAGE_INCR "Usage: incr <key>\n"
+#define RESPONSE_USAGE_APPEND "Usage: append <key> <value>\n"
+#define RESPONSE_USAGE_STRLEN "Usage: strlen <key>\n"
+#define RESPONSE_USAGE_EXPORT "Usage: export snapshot.bin\n"
+#define RESPONSE_USAGE_RPUSH "Usage: rpush <key> <value>\n"
+#define RESPONSE_USAGE_LPUSH "Usage: lpush <key> <value>\n"
+#define RESPONSE_USAGE_RPOP "Usage: rpop <key>\n"
+#define RESPONSE_USAGE_LPOP "Usage: lpop <key>\n"
+#define RESPONSE_USAGE_LLEN "Usage: llen <key>\n"
+#define RESPONSE_USAGE_LRANGE "Usage: lrange <key> <min> <max>\n"
 #define RESPONSE_UNKNOWN_COMMAND "Unknown command\n"
 #define MSG(key) Get_Message(key)
 
@@ -82,7 +82,7 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
     return;
   }
 
-  if (strcmp(cmd->command, "SET") == 0) {
+  if (strcmp(cmd->command, "set") == 0) {
     const char* key = cmd->argv[0];
     const char* value = cmd->argv[1];
 
@@ -97,7 +97,7 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
     TCP_Write(sock, MSG("OK"), 0);
   }
 
-  else if (strcmp(cmd->command, "GET") == 0) {
+  else if (strcmp(cmd->command, "get") == 0) {
 
     const char* key = cmd->argv[0];
     const char* value = cmd->argv[1];
@@ -125,7 +125,7 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
     } else {
       TCP_Write(sock, MSG("KEY_NOT_FOUND"), 0);
     }
-  } else if (strcmp(cmd->command, "APPEND") == 0) {
+  } else if (strcmp(cmd->command, "append") == 0) {
     const char* key = cmd->argv[0];
     const char* value = cmd->argv[1];
 
@@ -152,7 +152,7 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
     } else {
       TCP_Write(sock, MSG("KEY_NOT_FOUND"), 0);
     }
-  } else if (strcmp(cmd->command, "STRLEN") == 0) {
+  } else if (strcmp(cmd->command, "strlen") == 0) {
     const char* key = cmd->argv[0];
     const char* value = cmd->argv[1];
 
@@ -172,8 +172,9 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
       }
     }
 
-    // TODO (FIX) INCR not a number
-  } else if (strcmp(cmd->command, "INCR") == 0) {
+    // todo (David) 'incr' when key exists and value is not a number (it returns
+    // -1 and data is not modified)
+  } else if (strcmp(cmd->command, "incr") == 0) {
     const char* key = cmd->argv[0];
     const char* value = cmd->argv[1];
 
@@ -188,7 +189,7 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
     sprintf(as_number, "%" PRId64 "\n", result);
     TCP_Write(sock, as_number, 0);
 
-  } else if (strcmp(cmd->command, "EXPORT") == 0) {
+  } else if (strcmp(cmd->command, "export") == 0) {
     const char* key = cmd->argv[0];
     const char* value = cmd->argv[1];
 
@@ -203,11 +204,11 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
       DB_Log(DB_LOG_ERROR, "Exporting snapshot %s failed", key);
       TCP_Write(sock, MSG("FAILED"), 0);
     }
-  } else if (strcmp(cmd->command, "INSP") == 0) {
+  } else if (strcmp(cmd->command, "insp") == 0) {
     Print_Runtime_Context(context);
   }
 
-  else if (strcmp(cmd->command, "RPUSH") == 0) {
+  else if (strcmp(cmd->command, "rpush") == 0) {
     const char* key = cmd->argv[0];
     const char* value = cmd->argv[1];
     const TOKEN type = cmd->types[1];
@@ -252,7 +253,7 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
     }
   }
 
-  else if (strcmp(cmd->command, "LPUSH") == 0) {
+  else if (strcmp(cmd->command, "lpush") == 0) {
     const char* key = cmd->argv[0];
     const char* value = cmd->argv[1];
     const TOKEN type = cmd->types[1];
@@ -295,7 +296,7 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
     }
   }
 
-  else if (strcmp(cmd->command, "LPOP") == 0) {
+  else if (strcmp(cmd->command, "lpop") == 0) {
     const char* key = cmd->argv[0];
     const char* value = cmd->argv[1];
 
@@ -333,7 +334,7 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
     }
   }
 
-  else if (strcmp(cmd->command, "RPOP") == 0) {
+  else if (strcmp(cmd->command, "rpop") == 0) {
     const char* key = cmd->argv[0];
     const char* value = cmd->argv[1];
 
@@ -370,7 +371,7 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
     }
   }
 
-  else if (strcmp(cmd->command, "LLEN") == 0) {
+  else if (strcmp(cmd->command, "llen") == 0) {
     const char* key = cmd->argv[0];
     const char* value = cmd->argv[1];
 
@@ -388,15 +389,13 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
     } else {
       TCP_Write(sock, MSG("KEY_NOT_FOUND"), 0);
     }
-  }
-  else if (strcmp(cmd->command, "SUB") == 0) {
+  } else if (strcmp(cmd->command, "sub") == 0) {
     Subscribe(context->pubsub_system, cmd->argv[0], sock);
-  } else if (strcmp(cmd->command, "UNSUB") == 0) {
+  } else if (strcmp(cmd->command, "unsub") == 0) {
     Unsubscribe(context->pubsub_system, cmd->argv[0], sock);
-  } else if (strcmp(cmd->command, "PUB") == 0) {
+  } else if (strcmp(cmd->command, "pub") == 0) {
     Publish(context->pubsub_system, cmd->argv[0], cmd->argv[1]);
-  }
-  else if (strcmp(cmd->command, "LRANGE") == 0) {
+  } else if (strcmp(cmd->command, "lrange") == 0) {
     if (cmd->argc < 3) {
       TCP_Write(sock, MSG("USAGE_LRANGE"), 0);
       return;
@@ -415,7 +414,7 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
     } else {
       TCP_Write(sock, MSG("KEY_NOT_FOUND"), 1);
     }
-  } else if (strcmp(cmd->command, "LOAD") == 0) {
+  } else if (strcmp(cmd->command, "load") == 0) {
     if (Import_Snapshot(context, "snapshot.bin") == 0) {
       DB_Log(DB_LOG_INFO, "SNAPSHOT was loaded successfully");
     }

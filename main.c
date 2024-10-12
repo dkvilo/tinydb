@@ -105,7 +105,6 @@ main(int argc, char const* argv[])
   TCP_Server tcp_server = { 0 };
   TCP_Client tcp_client = { 0 };
 
-  Add_Webhook("@hook_test", "https://webhook.site/2b054855-6a59-4e30-abaa-0c76d6522c84");
   Add_Webhook("@hook_test", "http://localhost/webhook");
 
   List_Webhooks("@hook_test");
