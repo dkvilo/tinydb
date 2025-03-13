@@ -2,6 +2,7 @@
 #define __TINY_DB_DATATYPE
 
 #include <stdatomic.h>
+#include <time.h>
 #include "tinydb_list.h"
 #include "tinydb_hashmap.h"
 
@@ -43,6 +44,8 @@ typedef struct
   char* key;
   DB_Value value;
   DB_ENTRY_TYPE type;
+  time_t expiry;
+  bool has_ttl : 1;
 } DatabaseEntry;
 
 #endif // __TINY_DB_DATATYPE

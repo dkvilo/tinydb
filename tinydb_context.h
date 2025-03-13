@@ -13,11 +13,34 @@
 #include "tinydb_pubsub.h"
 #include "tinydb_user.h"
 
+typedef struct SnapshotConfig
+{
+  int enabled;
+  /* between snapshots in seconds */
+  int interval_seconds;
+  char* snapshot_filename;
+  pthread_t snapshot_thread;
+  atomic_int running;
+  time_t last_snapshot_time;
+} SnapshotConfig;
+
+typedef struct TTLCleanupConfig
+{
+  int enabled;
+  /* interval between TTL cleanup runs in seconds */
+  int interval_seconds;
+  pthread_t cleanup_thread;
+  atomic_int running;
+  time_t last_cleanup_time;
+} TTLCleanupConfig;
+
 typedef struct RuntimeContext
 {
   PubSubSystem* pubsub_system;
   DatabaseManager db_manager;
   UserManager user_manager;
+  SnapshotConfig snapshot_config;
+  TTLCleanupConfig ttl_cleanup_config;
   struct
   {
     Database* db;

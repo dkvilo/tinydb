@@ -53,16 +53,20 @@ Destroy_DB_Object(DB_Object* obj)
 void
 HPLinkedList_Destroy(HPLinkedList* list)
 {
-  if (list == NULL)
-    return;
+#if 0
+  if (list == NULL) return;
 
   ListNode* current = list->head;
   while (current != NULL) {
     ListNode* next = current->next;
-    Database_Entry_Destructor(&current->value);
+    if (current->type == TYPE_STRING && current->value.string_value != NULL) {
+      free(current->value.string_value);
+    }
+    
     free(current);
     current = next;
   }
 
   free(list);
+#endif
 }

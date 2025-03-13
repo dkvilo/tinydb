@@ -1,0 +1,17 @@
+CC = gcc
+CFLAGS = -Wall -Wextra
+LDFLAGS = -lreadline
+
+SRC = tinydb_client.c
+OBJ = $(SRC:.c=.o)
+EXEC = tinydb-client
+
+all: $(EXEC)
+
+$(EXEC): $(SRC)
+	$(CC) $(CFLAGS) $(SRC) -o $(EXEC) $(LDFLAGS)
+
+clean:
+	rm -f $(OBJ) $(EXEC)
+
+.PHONY: all clean

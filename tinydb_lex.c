@@ -4,7 +4,13 @@
 static const char* commands[] = { "set",    "get",   "rpush",  "lpush",
                                   "lpop",   "rpop",  "llen",   "lrange",
                                   "pub",    "sub",   "strlen", "incr",
-                                  "append", "unsub", "export", "insp" };
+                                  "append", "unsub", "export", "insp",
+                                  "create_user", "auth", "delete_user",
+                                  "snapshot_start", "snapshot_stop",
+                                  "snapshot_interval", "snapshot_status",
+                                  "expire", "ttl", "ttl_cleanup_start",
+                                  "ttl_cleanup_stop", "ttl_cleanup_interval",
+                                  "ttl_cleanup_status" };
 
 char
 Lexer_Peek(Lexer* lexer, const uint8_t* buf)
