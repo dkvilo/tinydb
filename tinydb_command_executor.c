@@ -2,22 +2,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
 
 #include "tinydb_atomic_proc.h"
 #include "tinydb_command_executor.h"
-#include "tinydb_context.h"
 #include "tinydb_database.h"
-#include "tinydb_datatype.h"
-#include "tinydb_event_tcp_server.h"
 #include "tinydb_list.h"
 #include "tinydb_log.h"
-#include "tinydb_pubsub.h"
 #include "tinydb_snapshot.h"
-#include "tinydb_ttl.h"
-#include "tinydb_user_manager.h"
-#include "tinydb_webhook.h"
 
 #define RESPONSE_OK "Ok\n"
 #define RESPONSE_FAILED "FAILED\n"
@@ -34,19 +26,6 @@
 #define RESPONSE_USAGE_LPOP "Usage: lpop <key>\n"
 #define RESPONSE_USAGE_LLEN "Usage: llen <key>\n"
 #define RESPONSE_USAGE_LRANGE "Usage: lrange <key> <min> <max>\n"
-#define RESPONSE_USAGE_CREATE_USER "Usage: create_user <username> <password>\n"
-#define RESPONSE_USAGE_AUTH "Usage: auth <username> <password>\n"
-#define RESPONSE_USAGE_DELETE_USER "Usage: delete_user <username>\n"
-#define RESPONSE_USAGE_SNAPSHOT_START "Usage: snapshot_start <interval_seconds> <filename>\n"
-#define RESPONSE_USAGE_SNAPSHOT_STOP "Usage: snapshot_stop\n"
-#define RESPONSE_USAGE_SNAPSHOT_INTERVAL "Usage: snapshot_interval <interval_seconds>\n"
-#define RESPONSE_USAGE_SNAPSHOT_STATUS "Usage: snapshot_status\n"
-#define RESPONSE_USAGE_EXPIRE "Usage: expire <key> <seconds>\n"
-#define RESPONSE_USAGE_TTL "Usage: ttl <key>\n"
-#define RESPONSE_USAGE_TTL_CLEANUP_START "Usage: ttl_cleanup_start <interval_seconds>\n"
-#define RESPONSE_USAGE_TTL_CLEANUP_STOP "Usage: ttl_cleanup_stop\n"
-#define RESPONSE_USAGE_TTL_CLEANUP_INTERVAL "Usage: ttl_cleanup_interval <interval_seconds>\n"
-#define RESPONSE_USAGE_TTL_CLEANUP_STATUS "Usage: ttl_cleanup_status\n"
 #define RESPONSE_UNKNOWN_COMMAND "Unknown command\n"
 #define MSG(key) Get_Message(key)
 
@@ -69,23 +48,10 @@ MessageLUT message_lut[] = { { "OK", RESPONSE_OK },
                              { "USAGE_EXPORT", RESPONSE_USAGE_EXPORT },
                              { "USAGE_RPUSH", RESPONSE_USAGE_RPUSH },
                              { "USAGE_LPUSH", RESPONSE_USAGE_LPUSH },
-                             { "USAGE_RPOP", RESPONSE_USAGE_RPOP },
                              { "USAGE_LPOP", RESPONSE_USAGE_LPOP },
+                             { "USAGE_RPOP", RESPONSE_USAGE_RPOP },
                              { "USAGE_LLEN", RESPONSE_USAGE_LLEN },
                              { "USAGE_LRANGE", RESPONSE_USAGE_LRANGE },
-                             { "USAGE_CREATE_USER", RESPONSE_USAGE_CREATE_USER },
-                             { "USAGE_AUTH", RESPONSE_USAGE_AUTH },
-                             { "USAGE_DELETE_USER", RESPONSE_USAGE_DELETE_USER },
-                             { "USAGE_SNAPSHOT_START", RESPONSE_USAGE_SNAPSHOT_START },
-                             { "USAGE_SNAPSHOT_STOP", RESPONSE_USAGE_SNAPSHOT_STOP },
-                             { "USAGE_SNAPSHOT_INTERVAL", RESPONSE_USAGE_SNAPSHOT_INTERVAL },
-                             { "USAGE_SNAPSHOT_STATUS", RESPONSE_USAGE_SNAPSHOT_STATUS },
-                             { "USAGE_EXPIRE", RESPONSE_USAGE_EXPIRE },
-                             { "USAGE_TTL", RESPONSE_USAGE_TTL },
-                             { "USAGE_TTL_CLEANUP_START", RESPONSE_USAGE_TTL_CLEANUP_START },
-                             { "USAGE_TTL_CLEANUP_STOP", RESPONSE_USAGE_TTL_CLEANUP_STOP },
-                             { "USAGE_TTL_CLEANUP_INTERVAL", RESPONSE_USAGE_TTL_CLEANUP_INTERVAL },
-                             { "USAGE_TTL_CLEANUP_STATUS", RESPONSE_USAGE_TTL_CLEANUP_STATUS },
                              { "UNKNOWN_COMMAND", RESPONSE_UNKNOWN_COMMAND } };
 
 static inline const char*
@@ -452,225 +418,6 @@ Execute_Command(int sock, ParsedCommand* cmd, Database* db)
     if (Import_Snapshot(context, "snapshot.bin") == 0) {
       DB_Log(DB_LOG_INFO, "SNAPSHOT was loaded successfully");
     }
-  } else if (strcmp(cmd->command, "create_user") == 0) {
-    const char* username = cmd->argv[0];
-    const char* password = cmd->argv[1];
-
-    if (username == NULL || password == NULL) {
-      TCP_Write(sock, MSG("USAGE_CREATE_USER"), 0);
-      return;
-    }
-
-    if (Create_User(context, username, password) == 0) {
-      DB_Log(DB_LOG_INFO, "User %s created successfully", username);
-      Print_User_Manager_State(context);
-      TCP_Write(sock, MSG("OK"), 0);
-    } else {
-      DB_Log(DB_LOG_ERROR, "Failed to create user %s", username);
-      TCP_Write(sock, MSG("FAILED"), 0);
-    }
-  } else if (strcmp(cmd->command, "auth") == 0) {
-    const char* username = cmd->argv[0];
-    const char* password = cmd->argv[1];
-
-    if (username == NULL || password == NULL) {
-      TCP_Write(sock, MSG("USAGE_AUTH"), 0);
-      return;
-    }
-
-    if (Authenticate_User(context, username, password) == 0) {
-      DB_Log(DB_LOG_INFO, "User %s authenticated successfully", username);
-      TCP_Write(sock, MSG("OK"), 0);
-    } else {
-      DB_Log(DB_LOG_ERROR, "Failed to authenticate user %s", username);
-      TCP_Write(sock, MSG("FAILED"), 0);
-    }
-  } else if (strcmp(cmd->command, "delete_user") == 0) {
-    const char* username = cmd->argv[0];
-
-    if (username == NULL) {
-      TCP_Write(sock, MSG("USAGE_DELETE_USER"), 0);
-      return;
-    }
-
-    if (Delete_User(context, username) == 0) {
-      DB_Log(DB_LOG_INFO, "User %s deleted successfully", username);
-      TCP_Write(sock, MSG("OK"), 0);
-    } else {
-      DB_Log(DB_LOG_ERROR, "Failed to delete user %s", username);
-      TCP_Write(sock, MSG("FAILED"), 0);
-    }
-  } else if (strcmp(cmd->command, "snapshot_start") == 0) {
-    if (cmd->argc < 2) {
-      TCP_Write(sock, MSG("USAGE_SNAPSHOT_START"), 0);
-      return;
-    }
-    const char* interval_str = cmd->argv[0];
-    const char* filename = cmd->argv[1];
-
-    int interval = atoi(interval_str);
-    if (interval <= 0) {
-      TCP_Write(sock, MSG("USAGE_SNAPSHOT_START"), 0);
-      return;
-    }
-
-    if (Start_Background_Snapshot(context, interval, filename) == 0) {
-      DB_Log(DB_LOG_INFO, "Snapshot started successfully with interval %d seconds and filename %s", interval, filename);
-      TCP_Write(sock, MSG("OK"), 0);
-    } else {
-      DB_Log(DB_LOG_ERROR, "Failed to start snapshot with interval %d seconds and filename %s", interval, filename);
-      TCP_Write(sock, MSG("FAILED"), 0);
-    }
-  } else if (strcmp(cmd->command, "snapshot_stop") == 0) {
-    if (Stop_Background_Snapshot(context) == 0) {
-      DB_Log(DB_LOG_INFO, "Snapshot stopped successfully");
-      TCP_Write(sock, MSG("OK"), 0);
-    } else {
-      DB_Log(DB_LOG_ERROR, "Failed to stop snapshot");
-      TCP_Write(sock, MSG("FAILED"), 0);
-    }
-  } else if (strcmp(cmd->command, "snapshot_interval") == 0) {
-    if (cmd->argc < 1) {
-      TCP_Write(sock, MSG("USAGE_SNAPSHOT_INTERVAL"), 0);
-      return;
-    }
-    const char* interval_str = cmd->argv[0];
-
-    int interval = atoi(interval_str);
-    if (interval <= 0) {
-      TCP_Write(sock, MSG("USAGE_SNAPSHOT_INTERVAL"), 0);
-      return;
-    }
-
-    if (Set_Snapshot_Interval(context, interval) == 0) {
-      DB_Log(DB_LOG_INFO, "Snapshot interval set to %d seconds", interval);
-      TCP_Write(sock, MSG("OK"), 0);
-    } else {
-      DB_Log(DB_LOG_ERROR, "Failed to set snapshot interval to %d seconds", interval);
-      TCP_Write(sock, MSG("FAILED"), 0);
-    }
-  } else if (strcmp(cmd->command, "snapshot_status") == 0) {
-    char status_buffer[256];
-    if (atomic_load(&context->snapshot_config.running)) {
-      time_t current_time = time(NULL);
-      time_t elapsed = current_time - context->snapshot_config.last_snapshot_time;
-      snprintf(status_buffer, sizeof(status_buffer), 
-              "Snapshot status: active\nInterval: %d seconds\nLast snapshot: %ld seconds ago\nFilename: %s\n",
-              context->snapshot_config.interval_seconds,
-              elapsed,
-              context->snapshot_config.snapshot_filename);
-    } else {
-      snprintf(status_buffer, sizeof(status_buffer), 
-              "Snapshot status: inactive\n");
-    }
-    TCP_Write(sock, status_buffer, 0);
-  } else if (strcmp(cmd->command, "expire") == 0 || strcmp(cmd->command, "ttl_set") == 0) {
-    const char* key = cmd->argv[0];
-    const char* seconds_str = cmd->argv[1];
-
-    if (key == NULL || seconds_str == NULL) {
-      TCP_Write(sock, MSG("USAGE_EXPIRE"), 0);
-      return;
-    }
-
-    int64_t seconds = atoll(seconds_str);
-    if (seconds < 0) {
-      TCP_Write(sock, MSG("FAILED"), 0);
-      return;
-    }
-
-    if (Set_TTL(db, key, seconds) == 0) {
-      DB_Log(DB_LOG_INFO, "Set TTL for key %s to %ld seconds", key, seconds);
-      TCP_Write(sock, MSG("OK"), 0);
-    } else {
-      DB_Log(DB_LOG_ERROR, "Failed to set TTL for key %s", key);
-      TCP_Write(sock, MSG("FAILED"), 0);
-    }
-  } else if (strcmp(cmd->command, "ttl") == 0) {
-    const char* key = cmd->argv[0];
-
-    if (key == NULL) {
-      TCP_Write(sock, MSG("USAGE_TTL"), 0);
-      return;
-    }
-
-    int64_t ttl = Get_TTL(db, key);
-    char ttl_buffer[32];
-    
-    if (ttl == -1) {
-      // Key doesn't exist
-      TCP_Write(sock, MSG("KEY_NOT_FOUND"), 0);
-    } else if (ttl == -2) {
-      // No TTL set
-      snprintf(ttl_buffer, sizeof(ttl_buffer), "-1\n");
-      TCP_Write(sock, ttl_buffer, 0);
-    } else {
-      // TTL exists
-      snprintf(ttl_buffer, sizeof(ttl_buffer), "%lld\n", ttl);
-      TCP_Write(sock, ttl_buffer, 0);
-    }
-  } else if (strcmp(cmd->command, "ttl_cleanup_start") == 0) {
-    if (cmd->argc < 1) {
-      TCP_Write(sock, MSG("USAGE_TTL_CLEANUP_START"), 0);
-      return;
-    }
-    const char* interval_str = cmd->argv[0];
-
-    int interval = atoi(interval_str);
-    if (interval <= 0) {
-      TCP_Write(sock, MSG("USAGE_TTL_CLEANUP_START"), 0);
-      return;
-    }
-
-    if (Start_TTL_Cleanup(context, interval) == 0) {
-      DB_Log(DB_LOG_INFO, "TTL cleanup started successfully with interval %d seconds", interval);
-      TCP_Write(sock, MSG("OK"), 0);
-    } else {
-      DB_Log(DB_LOG_ERROR, "Failed to start TTL cleanup with interval %d seconds", interval);
-      TCP_Write(sock, MSG("FAILED"), 0);
-    }
-  } else if (strcmp(cmd->command, "ttl_cleanup_stop") == 0) {
-    if (Stop_TTL_Cleanup(context) == 0) {
-      DB_Log(DB_LOG_INFO, "TTL cleanup stopped successfully");
-      TCP_Write(sock, MSG("OK"), 0);
-    } else {
-      DB_Log(DB_LOG_ERROR, "Failed to stop TTL cleanup");
-      TCP_Write(sock, MSG("FAILED"), 0);
-    }
-  } else if (strcmp(cmd->command, "ttl_cleanup_interval") == 0) {
-    if (cmd->argc < 1) {
-      TCP_Write(sock, MSG("USAGE_TTL_CLEANUP_INTERVAL"), 0);
-      return;
-    }
-    const char* interval_str = cmd->argv[0];
-
-    int interval = atoi(interval_str);
-    if (interval <= 0) {
-      TCP_Write(sock, MSG("USAGE_TTL_CLEANUP_INTERVAL"), 0);
-      return;
-    }
-
-    if (Set_TTL_Cleanup_Interval(context, interval) == 0) {
-      DB_Log(DB_LOG_INFO, "TTL cleanup interval set to %d seconds", interval);
-      TCP_Write(sock, MSG("OK"), 0);
-    } else {
-      DB_Log(DB_LOG_ERROR, "Failed to set TTL cleanup interval to %d seconds", interval);
-      TCP_Write(sock, MSG("FAILED"), 0);
-    }
-  } else if (strcmp(cmd->command, "ttl_cleanup_status") == 0) {
-    char status_buffer[256];
-    if (atomic_load(&context->ttl_cleanup_config.running)) {
-      time_t current_time = time(NULL);
-      time_t elapsed = current_time - context->ttl_cleanup_config.last_cleanup_time;
-      snprintf(status_buffer, sizeof(status_buffer), 
-              "TTL cleanup status: active\nInterval: %d seconds\nLast cleanup: %ld seconds ago\n",
-              context->ttl_cleanup_config.interval_seconds,
-              elapsed);
-    } else {
-      snprintf(status_buffer, sizeof(status_buffer), 
-              "TTL cleanup status: inactive\n");
-    }
-    TCP_Write(sock, status_buffer, 0);
   } else {
     TCP_Write(sock, MSG("UNKNOWN_COMMAND"), 0);
   }

@@ -5,12 +5,6 @@ DUMP.TXT
 .vscode/
 *.bin
 test/tests
-test/auth_test
-test/auth_integration_test
-test/benchmark
-test/stress_test
-
-tinydb-client
 
 # rust 
 benchmark/target/

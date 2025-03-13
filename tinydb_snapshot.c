@@ -3,12 +3,11 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <time.h>
 #include <unistd.h>
 
-#include "tinydb_database_entry_destructor.h"
 #include "tinydb_log.h"
 #include "tinydb_snapshot.h"
+#include "tinydb_database_entry_destructor.h"
 
 void
 write_string(FILE* file, const char* str)
@@ -430,15 +429,9 @@ Print_Runtime_Context(RuntimeContext* ctx)
   printf("  Number of users: %d\n", ctx->user_manager.num_users);
   for (int i = 0; i < ctx->user_manager.num_users; i++) {
     DB_User* user = &ctx->user_manager.users[i];
-    if (!user) {
-      printf("  User %d: NULL\n", i);
-      continue;
-    }
-
     printf("  User %d:\n", i);
     printf("    ID: %lu\n", (unsigned long)user->ID);
     printf("    Name: %s\n", user->name ? user->name : "NULL");
-
     if (user->access) {
       printf("    Access - Database: %lu, ACL: %d\n",
              (unsigned long)user->access->database,
@@ -451,137 +444,4 @@ Print_Runtime_Context(RuntimeContext* ctx)
   printf("Active:\n");
   printf("  Active DB: %p\n", (void*)ctx->Active.db);
   printf("  Active User: %p\n", (void*)ctx->Active.user);
-}
-
-/**
- * Background snapshot thread function
- */
-void*
-background_snapshot_thread(void* arg)
-{
-  RuntimeContext* ctx = (RuntimeContext*)arg;
-
-  DB_Log(DB_LOG_INFO,
-         "Background snapshot thread started with interval of %d seconds",
-         ctx->snapshot_config.interval_seconds);
-
-  while (atomic_load(&ctx->snapshot_config.running)) {
-    sleep(ctx->snapshot_config.interval_seconds);
-    if (!atomic_load(&ctx->snapshot_config.running)) {
-      break;
-    }
-
-    DB_Log(DB_LOG_INFO,
-           "Taking automatic background snapshot to %s",
-           ctx->snapshot_config.snapshot_filename);
-
-    if (Export_Snapshot(ctx, ctx->snapshot_config.snapshot_filename) == 0) {
-      ctx->snapshot_config.last_snapshot_time = time(NULL);
-      DB_Log(DB_LOG_INFO, "Background snapshot completed successfully");
-    } else {
-      DB_Log(DB_LOG_ERROR, "Background snapshot failed");
-    }
-  }
-
-  DB_Log(DB_LOG_INFO, "Background snapshot thread exiting");
-  return NULL;
-}
-
-/**
- * Start_Background_Snapshot - Starts a background thread that periodically
- * takes snapshots
- */
-int32_t
-Start_Background_Snapshot(RuntimeContext* ctx,
-                          int interval_seconds,
-                          const char* filename)
-{
-  if (ctx == NULL || filename == NULL || interval_seconds <= 0) {
-    DB_Log(DB_LOG_ERROR, "Invalid arguments to Start_Background_Snapshot");
-    return -1;
-  }
-
-  if (atomic_load(&ctx->snapshot_config.running)) {
-    DB_Log(DB_LOG_WARNING, "Background snapshot thread is already running");
-    return -1;
-  }
-
-  ctx->snapshot_config.enabled = 1;
-  ctx->snapshot_config.interval_seconds = interval_seconds;
-
-  if (ctx->snapshot_config.snapshot_filename != NULL) {
-    free(ctx->snapshot_config.snapshot_filename);
-  }
-
-  ctx->snapshot_config.snapshot_filename = strdup(filename);
-  if (ctx->snapshot_config.snapshot_filename == NULL) {
-    DB_Log(DB_LOG_ERROR, "Failed to allocate memory for snapshot filename");
-    return -1;
-  }
-
-  atomic_store(&ctx->snapshot_config.running, 1);
-
-  if (pthread_create(&ctx->snapshot_config.snapshot_thread,
-                     NULL,
-                     background_snapshot_thread,
-                     ctx) != 0) {
-    DB_Log(DB_LOG_ERROR, "Failed to create background snapshot thread");
-    atomic_store(&ctx->snapshot_config.running, 0);
-    free(ctx->snapshot_config.snapshot_filename);
-    ctx->snapshot_config.snapshot_filename = NULL;
-    return -1;
-  }
-
-  DB_Log(DB_LOG_INFO,
-         "Background snapshot thread started with interval %d seconds",
-         interval_seconds);
-
-  return 0;
-}
-
-/**
- * Stop_Background_Snapshot - Stops the background snapshot thread
- */
-int32_t
-Stop_Background_Snapshot(RuntimeContext* ctx)
-{
-  if (ctx == NULL) {
-    DB_Log(DB_LOG_ERROR, "NULL context in Stop_Background_Snapshot");
-    return -1;
-  }
-
-  if (!atomic_load(&ctx->snapshot_config.running)) {
-    DB_Log(DB_LOG_WARNING, "No background snapshot thread is running");
-    return -1;
-  }
-
-  atomic_store(&ctx->snapshot_config.running, 0);
-
-  if (pthread_join(ctx->snapshot_config.snapshot_thread, NULL) != 0) {
-    DB_Log(DB_LOG_ERROR, "Failed to join background snapshot thread");
-    return -1;
-  }
-
-  ctx->snapshot_config.enabled = 0;
-  DB_Log(DB_LOG_INFO, "Background snapshot thread stopped");
-
-  return 0;
-}
-
-/**
- * Set_Snapshot_Interval - Changes the interval between snapshots
- */
-int32_t
-Set_Snapshot_Interval(RuntimeContext* ctx, int interval_seconds)
-{
-  if (ctx == NULL || interval_seconds <= 0) {
-    DB_Log(DB_LOG_ERROR, "Invalid arguments to Set_Snapshot_Interval");
-    return -1;
-  }
-
-  ctx->snapshot_config.interval_seconds = interval_seconds;
-  DB_Log(
-    DB_LOG_INFO, "Snapshot interval updated to %d seconds", interval_seconds);
-
-  return 0;
 }
