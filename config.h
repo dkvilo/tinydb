@@ -19,6 +19,18 @@
 // snapshot that will be created every time program will terminate
 #define DEFAULT_EXIT_SNAPSHOT_NAME "on_exit_snapshot.bin"
 
+// automatic background snapshots
+#define ENABLE_BACKGROUND_SNAPSHOTS 1
+
+// interval for automatic background snapshots
+#define DEFAULT_SNAPSHOT_INTERVAL 300  // 5 minutes
+
+// automatic TTL cleanup
+#define ENABLE_TTL_CLEANUP 1
+
+// interval for automatic TTL cleanup in seconds
+#define DEFAULT_TTL_CLEANUP_INTERVAL 60  // 1 minute
+
 // number of initial databases to be initalized by default on startup
 #define NUM_INITAL_DATABASES 1
 
