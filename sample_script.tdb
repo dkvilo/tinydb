@@ -1,0 +1,32 @@
+# TinyDB Sample Script
+# This is a comment and will be ignored
+
+set greeting "Hello, TinyDB!"
+set counter 1
+set user:name "John Doe"
+set user:email "john@example.com"
+
+get greeting
+get counter
+get user:name
+get user:email
+
+incr counter
+get counter
+
+set temp_key "This will expire"
+expire temp_key 10
+ttl temp_key
+
+rpush mylist "first item"
+rpush mylist "second item"
+rpush mylist "third item"
+llen mylist
+lrange mylist 0 -1
+
+create_user test 123
+create_user test2 123
+auth test 123
+delete_user test2
+
+
