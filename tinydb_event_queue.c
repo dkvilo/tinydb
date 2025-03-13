@@ -12,6 +12,15 @@
 #include <time.h>
 #include <unistd.h>
 
+// structure for epoll to store both fd and user_data
+#ifdef USE_EPOLL
+typedef struct
+{
+  int fd;
+  void* user_data;
+} EventData;
+#endif
+
 static bool
 set_nonblocking(int fd)
 {
@@ -42,14 +51,12 @@ EventQueue_Init(EventQueue* queue, int max_events)
   queue->max_events = max_events;
 
 #ifdef USE_KQUEUE
-  // Create kqueue
   queue->queue_fd = kqueue();
   if (queue->queue_fd == -1) {
     DB_Log(DB_LOG_ERROR, "Failed to create kqueue: %s", strerror(errno));
     return false;
   }
 
-  // Allocate memory for events
   queue->events = (struct kevent*)malloc(sizeof(struct kevent) * max_events);
   if (!queue->events) {
     close(queue->queue_fd);
@@ -57,14 +64,12 @@ EventQueue_Init(EventQueue* queue, int max_events)
     return false;
   }
 #else
-  // Create epoll
   queue->queue_fd = epoll_create1(0);
   if (queue->queue_fd == -1) {
     DB_Log(DB_LOG_ERROR, "Failed to create epoll: %s", strerror(errno));
     return false;
   }
 
-  // Allocate memory for events
   queue->events =
     (struct epoll_event*)malloc(sizeof(struct epoll_event) * max_events);
   if (!queue->events) {
@@ -140,9 +145,18 @@ EventQueue_Add(EventQueue* queue, int fd, EventType event_type, void* user_data)
   }
 
   ev.events |= EPOLLERR | EPOLLHUP;
-  ev.data.ptr = user_data;
+  EventData* event_data = (EventData*)malloc(sizeof(EventData));
+  if (!event_data) {
+    DB_Log(DB_LOG_ERROR, "Failed to allocate memory for event data");
+    return false;
+  }
+
+  event_data->fd = fd;
+  event_data->user_data = user_data;
+  ev.data.ptr = event_data;
 
   if (epoll_ctl(queue->queue_fd, EPOLL_CTL_ADD, fd, &ev) == -1) {
+    free(event_data);
     DB_Log(
       DB_LOG_ERROR, "Failed to add fd %d to epoll: %s", fd, strerror(errno));
     return false;
@@ -206,9 +220,38 @@ EventQueue_Modify(EventQueue* queue,
 
   ev.events |= EPOLLERR | EPOLLHUP;
 
-  ev.data.ptr = user_data;
+  // try to get the existing one
+  struct epoll_event old_ev;
+  if (epoll_ctl(queue->queue_fd, EPOLL_CTL_DEL, fd, &old_ev) == -1) {
+    if (errno != ENOENT) {
+      DB_Log(DB_LOG_ERROR,
+             "Failed to get existing event data for fd %d: %s",
+             fd,
+             strerror(errno));
+      return false;
+    }
 
-  if (epoll_ctl(queue->queue_fd, EPOLL_CTL_MOD, fd, &ev) == -1) {
+    // event doesn't exist, create new EventData
+    EventData* event_data = (EventData*)malloc(sizeof(EventData));
+    if (!event_data) {
+      DB_Log(DB_LOG_ERROR, "Failed to allocate memory for event data");
+      return false;
+    }
+
+    event_data->fd = fd;
+    event_data->user_data = user_data;
+    ev.data.ptr = event_data;
+  } else {
+    // use existing EventData
+    EventData* event_data = (EventData*)old_ev.data.ptr;
+    event_data->user_data = user_data;
+    ev.data.ptr = event_data;
+  }
+
+  if (epoll_ctl(queue->queue_fd, EPOLL_CTL_ADD, fd, &ev) == -1) {
+    if (ev.data.ptr != old_ev.data.ptr) {
+      free(ev.data.ptr);
+    }
     DB_Log(
       DB_LOG_ERROR, "Failed to modify fd %d in epoll: %s", fd, strerror(errno));
     return false;
@@ -239,13 +282,19 @@ EventQueue_Remove(EventQueue* queue, int fd)
   // ignore errors as the filters might not exist
   kevent(queue->queue_fd, changes, 2, NULL, 0, NULL);
 #else
-  if (epoll_ctl(queue->queue_fd, EPOLL_CTL_DEL, fd, NULL) == -1) {
+  struct epoll_event ev;
+  if (epoll_ctl(queue->queue_fd, EPOLL_CTL_DEL, fd, &ev) == -1) {
     if (errno != ENOENT) {
       DB_Log(DB_LOG_ERROR,
              "Failed to remove fd %d from epoll: %s",
              fd,
              strerror(errno));
       return false;
+    }
+  } else {
+    // free the EventData structure
+    if (ev.data.ptr) {
+      free(ev.data.ptr);
     }
   }
 #endif
@@ -323,8 +372,18 @@ EventQueue_Wait(EventQueue* queue,
   }
 
   for (int i = 0; i < num_events; i++) {
-    out_events[i].fd = queue->events[i].data.fd;
-    out_events[i].user_data = queue->events[i].data.ptr;
+    EventData* event_data = (EventData*)queue->events[i].data.ptr;
+    if (event_data) {
+      out_events[i].fd = event_data->fd;
+      out_events[i].user_data = event_data->user_data;
+    } else {
+      // this should never happen, but just in case
+      out_events[i].fd = -1;
+      out_events[i].user_data = NULL;
+      DB_Log(DB_LOG_ERROR, "NULL event data encountered in epoll_wait result");
+      continue;
+    }
+
     out_events[i].type = 0;
 
     if (queue->events[i].events & EPOLLIN) {

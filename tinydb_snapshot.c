@@ -461,10 +461,6 @@ background_snapshot_thread(void* arg)
 {
   RuntimeContext* ctx = (RuntimeContext*)arg;
 
-  DB_Log(DB_LOG_INFO,
-         "Background snapshot thread started with interval of %d seconds",
-         ctx->snapshot_config.interval_seconds);
-
   while (atomic_load(&ctx->snapshot_config.running)) {
     sleep(ctx->snapshot_config.interval_seconds);
     if (!atomic_load(&ctx->snapshot_config.running)) {

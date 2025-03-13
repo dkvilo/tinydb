@@ -173,10 +173,6 @@ ttl_cleanup_thread(void* arg)
 {
   RuntimeContext* ctx = (RuntimeContext*)arg;
 
-  DB_Log(DB_LOG_INFO,
-         "Background TTL cleanup thread started with interval of %d seconds",
-         ctx->ttl_cleanup_config.interval_seconds);
-
   while (atomic_load(&ctx->ttl_cleanup_config.running)) {
     sleep(ctx->ttl_cleanup_config.interval_seconds);
     if (!atomic_load(&ctx->ttl_cleanup_config.running)) {
